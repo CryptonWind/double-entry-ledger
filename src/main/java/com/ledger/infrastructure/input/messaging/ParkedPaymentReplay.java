@@ -6,9 +6,7 @@ import lombok.extern.log4j.Log4j2;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
-import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.stereotype.Component;
 
 /** Explicit one-shot operational mode; publisher confirmation always precedes the original ACK. */
@@ -18,7 +16,6 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "ledger.payments.replay", havingValue = "true")
 public class ParkedPaymentReplay implements ApplicationRunner {
     private final RabbitTemplate rabbit;
-    private final ConfigurableApplicationContext context;
     @org.springframework.beans.factory.annotation.Value("${ledger.payments.replay-limit:100}")
     private int limit;
 
@@ -58,6 +55,6 @@ public class ParkedPaymentReplay implements ApplicationRunner {
             return completed;
         });
         log.info("Parked payment replay completed count={}", replayed);
-        SpringApplication.exit(context, () -> 0);
+        // main closes the context after SpringApplication.run has completed startup.
     }
 }

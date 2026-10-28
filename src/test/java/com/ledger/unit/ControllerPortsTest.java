@@ -35,6 +35,8 @@ class ControllerPortsTest {
         when(accounts.get("account")).thenReturn(view);
         assertThat(((AccountDto) controller.getAccount("account").getBody()).getId()).isEqualTo(view.id());
         Instant at = Instant.EPOCH;
+        when(history.entries("account", 0, 50, at)).thenReturn(new com.ledger.application.AccountHistoryService.EntryPage(List.of(), 0, 50, 0, 0, at));
+        when(history.balance("account", at)).thenReturn(new com.ledger.application.AccountHistoryService.HistoricalBalance("account", "EUR", at, BigDecimal.ZERO));
         controller.getAccountEntries("account", 0, 50, at);
         controller.getHistoricalBalance("account", at);
         verify(history).entries("account", 0, 50, at);
@@ -54,6 +56,10 @@ class ControllerPortsTest {
         var request = new RecordTransactionDto().description("Settlement").entries(List.of(
                 new EntryInputDto().accountId("settlement-EUR").direction(EntryInputDto.DirectionEnum.DEBIT).amount(new BigDecimal("125.50")),
                 new EntryInputDto().accountId("merchant").direction(EntryInputDto.DirectionEnum.CREDIT).amount(new BigDecimal("125.50"))));
+        var view = new TransactionView("tx", "Settlement", Instant.EPOCH, null, "EUR", List.of());
+        when(ledger.record(any())).thenReturn(view);
+        when(ledger.get("tx")).thenReturn(view);
+        when(ledger.reverse("tx")).thenReturn(view);
         assertThat(controller.recordTransaction("key", request, null, null).getStatusCode().value()).isEqualTo(201);
         verify(ledger).record(argThat(command -> command.description().equals("Settlement") && command.entries().size() == 2));
         controller.getTransaction("tx");
@@ -63,7 +69,9 @@ class ControllerPortsTest {
         var interceptor = new com.ledger.infrastructure.input.rest.RejectReversalBody();
         var httpRequest = new org.springframework.mock.web.MockHttpServletRequest("POST", "/api/v1/transactions/tx/reversals");
         httpRequest.setContent(new byte[]{1});
-        assertThatThrownBy(() -> interceptor.preHandle(httpRequest, new org.springframework.mock.web.MockHttpServletResponse(), controller))
+        var handler = new org.springframework.web.method.HandlerMethod(controller,
+                org.springframework.util.ReflectionUtils.findMethod(TransactionController.class, "reverseTransaction", String.class, String.class, String.class, String.class));
+        assertThatThrownBy(() -> interceptor.preHandle(httpRequest, new org.springframework.mock.web.MockHttpServletResponse(), handler))
                 .isInstanceOf(LedgerException.class);
     }
 }

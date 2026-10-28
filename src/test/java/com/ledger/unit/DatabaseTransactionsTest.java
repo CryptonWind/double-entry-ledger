@@ -11,6 +11,21 @@ import static org.mockito.Mockito.*;
 
 class DatabaseTransactionsTest extends UnitTestBase {
     @Test
+    void joinedTransientFailureEscapesWithoutRetryingTheInvalidTransaction() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        var attempts = new AtomicInteger();
+        try {
+            assertThatThrownBy(() -> transactions.required(() -> {
+                attempts.incrementAndGet();
+                throw new CannotAcquireLockException("Joined transaction must be restarted by owner");
+            })).isInstanceOf(CannotAcquireLockException.class);
+            assertThat(attempts).hasValue(1);
+            verifyNoInteractions(template);
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        }
+    }
+    @Test
     void requiredJoinsExistingWriteBoundaryWithoutOpeningAnotherTransaction() {
         org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
         try {

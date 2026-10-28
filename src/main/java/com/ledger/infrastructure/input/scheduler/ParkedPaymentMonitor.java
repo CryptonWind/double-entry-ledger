@@ -8,6 +8,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "ledger.payments.replay", havingValue = "false", matchIfMissing = true)
 @Log4j2
 public class ParkedPaymentMonitor {
     private final RabbitTemplate rabbit;

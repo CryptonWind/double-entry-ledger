@@ -239,6 +239,10 @@ target/generated-sources; IntelliJ can import it after Maven reload/generation.
 A changed interface makes incompatible implementations fail compilation.
 Springdoc also exposes /v3/api-docs[.yaml] from the generated interface annotations.
 Generation does not start the application, containers or tests.
+REST response mapping is explicit in RestResponseMapper rather than a JSON
+serialization/deserialization round trip. ResponseContractTest compares application
+record fields with generated DTO fields to catch accidental schema drift. Remaining
+internal Jackson failures produce a structured 500 response without exposing details.
 The API contract defines the REST interfaces and DTOs for this initial version.
 
 | Method | Path | Purpose |
@@ -426,15 +430,23 @@ resets retry metadata, republishes a persistent payment to the durable input que
 waits for broker confirmation and then ACKs the parked original. Failed replay retains
 the original. A crash between confirmation and ACK may duplicate delivery; payment-ID
 deduplication protects financial effects. Replay does not run automatically.
+Replay mode disables the payment consumer, outbox scheduler and parked monitor
+in application code, independently of helper-script flags. The runner performs
+replay; main closes the context and exits only after startup has completed.
 
 Micrometer counters: ledger.payments.recovery (destination tag),
 ledger.payments.recovery.publication.failures; gauge: ledger.payments.parked.ready.
 Every minute each instance logs a warning if parked messages await replay. These
 metrics are per instance; the queue gauge measures ready messages, not unacknowledged
 deliveries. Export using your preferred monitoring registry; management endpoint
-exposure remains restricted to the existing health/info configuration.
+endpoints expose health, info and metrics. Read /actuator/metrics/ledger.payments.parked.ready
+or /actuator/metrics/ledger.payments.recovery to inspect values. Restrict management
+network access because this challenge deliberately has no authentication.
 
 Write use cases establish their own boundary through UnitOfWork.required. When
+joining an existing transaction, transient errors escape to its owner; retries
+restart the entire outer operation, never just part of an already failed transaction.
+When
 called from idempotency they join its existing write transaction without introducing
 a rollback-only marker for a caught business refusal. Standalone jobs/listeners can
 invoke them safely as well. Outbox completion logs success only when the token-checked

@@ -24,14 +24,15 @@ public class TransactionController implements TransactionsApi {
                 .map(entry -> new LedgerModels.EntryInput(entry.getAccountId(), Direction.valueOf(entry.getDirection().getValue()), entry.getAmount()))
                 .toList());
         return response(idempotency.execute("record-transaction", key, command,
-                () -> json.read(json.write(ledger.record(command)), TransactionDto.class)));
+                () -> RestResponseMapper.transaction(ledger.record(command))));
     }
-    @Override public ResponseEntity<?> reverseTransaction(String id, String key, String correlationId, String traceparent) {
+    @Override @NoRequestBody
+    public ResponseEntity<?> reverseTransaction(String id, String key, String correlationId, String traceparent) {
         return response(idempotency.execute("reverse-transaction", key, id,
-                () -> json.read(json.write(ledger.reverse(id)), TransactionDto.class)));
+                () -> RestResponseMapper.transaction(ledger.reverse(id))));
     }
     @Override public ResponseEntity<?> getTransaction(String id) {
-        return ResponseEntity.ok(json.read(json.write(ledger.get(id)), TransactionDto.class));
+        return ResponseEntity.ok(RestResponseMapper.transaction(ledger.get(id)));
     }
     private ResponseEntity<?> response(IdempotentOperations.StoredResponse result) {
         return ResponseEntity.status(result.status()).contentType(MediaType.APPLICATION_JSON).body(result.body());

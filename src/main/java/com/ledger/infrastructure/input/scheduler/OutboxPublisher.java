@@ -17,7 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Component
 @RequiredArgsConstructor
 @Log4j2
-@ConditionalOnProperty(name = "ledger.outbox.enabled", havingValue = "true", matchIfMissing = true)
+@org.springframework.boot.autoconfigure.condition.ConditionalOnExpression("${ledger.outbox.enabled:true} and !${ledger.payments.replay:false}")
 public class OutboxPublisher {
     private final EntityManager entities;
     private final TransactionTemplate transactions;

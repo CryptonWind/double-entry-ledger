@@ -22,6 +22,7 @@ import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
 @Component
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(name = "ledger.payments.replay", havingValue = "false", matchIfMissing = true)
 @RequiredArgsConstructor
 @Log4j2
 public class PaymentConsumer {

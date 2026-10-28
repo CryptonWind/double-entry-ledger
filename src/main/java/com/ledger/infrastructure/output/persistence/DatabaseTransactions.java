@@ -19,6 +19,7 @@ public class DatabaseTransactions implements com.ledger.application.port.out.Uni
                 throw new IllegalStateException("A write use case cannot join a read-only transaction");
             }
             // A domain refusal is deliberately caught by the outer idempotency use case.
+            // Never retry inside this transaction: transient failures escape to its owner.
             return action.get();
         }
         return execute(action);

@@ -16,6 +16,12 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 @RestControllerAdvice
 @Log4j2
 public class ApiExceptionHandler {
+    @ExceptionHandler(tools.jackson.core.JacksonException.class)
+    ResponseEntity<ApiError> internalSerialization(tools.jackson.core.JacksonException e) {
+        log.error("Internal JSON serialization failure", e);
+        return ResponseEntity.internalServerError().body(new ApiError("INTERNAL_SERIALIZATION_ERROR", null,
+                "The server could not produce the response"));
+    }
     @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
     ResponseEntity<ApiError> constraint(jakarta.validation.ConstraintViolationException e) {
         var violation = e.getConstraintViolations().iterator().next();
