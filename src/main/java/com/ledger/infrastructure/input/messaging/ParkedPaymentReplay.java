@@ -40,7 +40,7 @@ public class ParkedPaymentReplay implements ApplicationRunner {
                     headers.remove("ledger-retry-count");
                     headers.remove("x-death");
                     headers.put("ledger-replayed-at", java.time.Instant.now().toString());
-                    AMQP.BasicProperties properties = original.getProps().builder().headers(headers).deliveryMode(2).build();
+                    AMQP.BasicProperties properties = original.getProps().builder().headers(headers).expiration(null).deliveryMode(2).build();
                     returned.set(false);
                     channel.basicPublish("", "ledger.payment-settled", true, properties, original.getBody());
                     channel.waitForConfirmsOrDie(10000);

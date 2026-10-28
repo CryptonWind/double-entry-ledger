@@ -4,7 +4,8 @@ import com.ledger.application.port.in.AccountUseCases;
 import com.ledger.application.port.out.AccountHistoryReader;
 import com.ledger.domain.service.MoneyRules;
 import com.ledger.domain.exception.LedgerException;
-import com.ledger.domain.model.Direction;
+import com.ledger.application.model.EntryPage;
+import com.ledger.application.model.HistoricalBalance;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -18,10 +19,6 @@ public class AccountHistoryService implements com.ledger.application.port.in.Acc
     private final AccountUseCases accounts;
     private final AccountHistoryReader reader;
     private final UnitOfWork work;
-    public record HistoryEntry(String id, String transactionId, Instant recordedAt, int position,
-                               Direction direction, BigDecimal amount, BigDecimal balanceAfter) { }
-    public record EntryPage(List<HistoryEntry> content, int page, int size, long totalElements, long totalPages, Instant asOf) { }
-    public record HistoricalBalance(String accountId, String currency, Instant at, BigDecimal balance) { }
 
     public EntryPage entries(String id, int page, int size, Instant asOf) {
         if (page < 0 || size < 1 || size > 200 || (long) page * size > Integer.MAX_VALUE) {

@@ -44,7 +44,7 @@ class ArchitectureTest {
                         type -> type.getPackageName().startsWith("com.ledger.application")
                                 && !type.isInterface() && type.getSimpleName().endsWith("Service"));
         noClasses().that().areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
-                .should().accessClassesThat(concreteApplicationServices)
+                .should().dependOnClassesThat(concreteApplicationServices)
                 .check(CLASSES);
         noClasses().that().resideInAPackage("com.ledger.infrastructure.input.rest..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.ledger.infrastructure.output.persistence..",

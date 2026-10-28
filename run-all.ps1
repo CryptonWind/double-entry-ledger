@@ -1,8 +1,14 @@
 [CmdletBinding()]
-param()
+param([switch]$Fresh)
 
 $ErrorActionPreference = 'Stop'
 $compose = @('compose', '--file', "$PSScriptRoot\compose.yaml", '--file', "$PSScriptRoot\compose-full.yaml")
+
+if ($Fresh) {
+    'Fresh setup: deleting this project''s containers and database/broker volumes.'
+    & docker @compose down --volumes --remove-orphans
+    if ($LASTEXITCODE -ne 0) { throw 'Fresh setup cleanup failed.' }
+}
 
 & docker @compose build app tests
 if ($LASTEXITCODE -ne 0) { throw 'Docker build failed.' }

@@ -1,7 +1,7 @@
 package com.ledger.infrastructure.input.rest;
 
 import com.ledger.application.model.LedgerModels.*;
-import com.ledger.application.AccountHistoryService.*;
+import com.ledger.application.model.*;
 import com.ledger.infrastructure.input.rest.generated.model.*;
 
 /** Explicit typed mapping: generated schema changes are visible to the compiler. */

@@ -35,8 +35,8 @@ class ControllerPortsTest {
         when(accounts.get("account")).thenReturn(view);
         assertThat(((AccountDto) controller.getAccount("account").getBody()).getId()).isEqualTo(view.id());
         Instant at = Instant.EPOCH;
-        when(history.entries("account", 0, 50, at)).thenReturn(new com.ledger.application.AccountHistoryService.EntryPage(List.of(), 0, 50, 0, 0, at));
-        when(history.balance("account", at)).thenReturn(new com.ledger.application.AccountHistoryService.HistoricalBalance("account", "EUR", at, BigDecimal.ZERO));
+        when(history.entries("account", 0, 50, at)).thenReturn(new com.ledger.application.model.EntryPage(List.of(), 0, 50, 0, 0, at));
+        when(history.balance("account", at)).thenReturn(new com.ledger.application.model.HistoricalBalance("account", "EUR", at, BigDecimal.ZERO));
         controller.getAccountEntries("account", 0, 50, at);
         controller.getHistoricalBalance("account", at);
         verify(history).entries("account", 0, 50, at);

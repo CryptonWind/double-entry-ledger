@@ -1,7 +1,7 @@
 package com.ledger.infrastructure.output.persistence;
 
-import com.ledger.application.AccountHistoryService.EntryPage;
-import com.ledger.application.AccountHistoryService.HistoryEntry;
+import com.ledger.application.model.EntryPage;
+import com.ledger.application.model.HistoryEntry;
 import com.ledger.application.port.out.AccountHistoryReader;
 import com.ledger.domain.model.Direction;
 import jakarta.persistence.EntityManager;

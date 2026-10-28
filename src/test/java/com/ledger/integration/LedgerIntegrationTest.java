@@ -332,7 +332,7 @@ class LedgerIntegrationTest extends com.ledger.support.IntegrationTestBase {
         assertThat(result.entries().get(1).balanceAfter()).isEqualByComparingTo("1.00");
         assertThat(result.entries().get(2).balanceAfter()).isEqualByComparingTo("3.00");
         assertThat(history.entries(a, 0, 50, result.recordedAt()).content())
-                .extracting(AccountHistoryService.HistoryEntry::position).containsExactly(2, 1);
+                .extracting(com.ledger.application.model.HistoryEntry::position).containsExactly(2, 1);
     }
 
     @Test

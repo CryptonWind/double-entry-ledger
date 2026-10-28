@@ -18,6 +18,12 @@ setup, not a project requirement. Start the engine first. Linux/macOS:
 sh run-all.sh
 ```
 
+For a disposable database left from earlier development schema definitions, use
+`sh run-all.sh --fresh`, or `powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\run-all.ps1 -Fresh`.
+This explicitly deletes this project's containers and MySQL/RabbitMQ volumes before
+startup. It permanently removes local ledger data and queued messages. Normal runs
+preserve volumes; a Flyway history mismatch requires a fresh database, not Flyway repair.
+
 Windows PowerShell:
 
 ```powershell
@@ -243,6 +249,9 @@ REST response mapping is explicit in RestResponseMapper rather than a JSON
 serialization/deserialization round trip. ResponseContractTest compares application
 record fields with generated DTO fields to catch accidental schema drift. Remaining
 internal Jackson failures produce a structured 500 response without exposing details.
+Type checks include primitive/wrapper equivalence, nested list element schemas,
+exact monetary/time types and generated enum representations. History result types
+live in application/model independently of use-case implementation classes.
 The API contract defines the REST interfaces and DTOs for this initial version.
 
 | Method | Path | Purpose |
@@ -427,6 +436,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\replay-parked.ps1 -Lim
 
 The one-shot container snapshots the parked ready count, consumes without auto-ACK,
 resets retry metadata, republishes a persistent payment to the durable input queue,
+clears the original per-message expiration to prevent immediate expiry after replay,
 waits for broker confirmation and then ACKs the parked original. Failed replay retains
 the original. A crash between confirmation and ACK may duplicate delivery; payment-ID
 deduplication protects financial effects. Replay does not run automatically.

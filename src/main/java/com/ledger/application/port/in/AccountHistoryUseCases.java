@@ -1,7 +1,7 @@
 package com.ledger.application.port.in;
 
-import com.ledger.application.AccountHistoryService.EntryPage;
-import com.ledger.application.AccountHistoryService.HistoricalBalance;
+import com.ledger.application.model.EntryPage;
+import com.ledger.application.model.HistoricalBalance;
 import java.time.Instant;
 
 public interface AccountHistoryUseCases {

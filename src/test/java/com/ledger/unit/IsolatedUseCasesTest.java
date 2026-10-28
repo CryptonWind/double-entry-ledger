@@ -39,7 +39,7 @@ class IsolatedUseCasesTest {
         when(reader.balance(opened.id(), at)).thenReturn(new BigDecimal("25.50"));
         assertThat(history.balance(opened.id(), at).balance()).isEqualByComparingTo("25.50");
         when(reader.entries(opened.id(), 0, 50, at, 2))
-                .thenReturn(new AccountHistoryService.EntryPage(List.of(), 0, 50, 0, 0, at));
+                .thenReturn(new com.ledger.application.model.EntryPage(List.of(), 0, 50, 0, 0, at));
         assertThat(history.entries(opened.id(), 0, 50, at).content()).isEmpty();
     }
 

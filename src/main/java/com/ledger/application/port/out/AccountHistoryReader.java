@@ -1,6 +1,6 @@
 package com.ledger.application.port.out;
 
-import com.ledger.application.AccountHistoryService.EntryPage;
+import com.ledger.application.model.EntryPage;
 import java.math.BigDecimal;
 import java.time.Instant;
 
