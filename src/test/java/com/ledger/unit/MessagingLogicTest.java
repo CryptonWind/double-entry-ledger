@@ -42,19 +42,28 @@ class MessagingLogicTest extends UnitTestBase {
         when(entities.createNativeQuery(anyString(), eq(OutboxEvent.class))).thenReturn(query);
         var event = new OutboxEvent("event", "{}", Instant.now(), null, "correlation", null);
         when(query.getResultList()).thenReturn(List.of(event), List.of());
-        Query update = mock(Query.class, RETURNS_SELF);
-        when(entities.createNativeQuery(anyString())).thenReturn(update);
+        Query claimUpdate = mock(Query.class, RETURNS_SELF);
+        Query publishedUpdate = mock(Query.class, RETURNS_SELF);
+        when(entities.createNativeQuery(contains("SET lease_token="))).thenReturn(claimUpdate);
+        when(entities.createNativeQuery(contains("SET published_at="))).thenReturn(publishedUpdate);
         confirm(true, false);
         outbox.publishPending();
-        verify(update).setParameter(eq("id"), eq("event"));
+        verify(claimUpdate).setParameter("id", "event");
+        verify(publishedUpdate).setParameter("id", "event");
+        verify(claimUpdate).executeUpdate();
+        verify(publishedUpdate).executeUpdate();
         verify(entities).createNativeQuery(contains("SET published_at="));
         var pending = new OutboxEvent("pending", "{}", Instant.now(), null, "correlation", null);
         when(query.getResultList()).thenReturn(List.of(pending), List.of());
         clearInvocations(entities);
+        clearInvocations(claimUpdate, publishedUpdate);
         reset(rabbit);
         confirm(false, false);
         outbox.publishPending();
         assertThat(pending.getPublishedAt()).isNull();
+        verify(claimUpdate).setParameter("id", "pending");
+        verify(claimUpdate).executeUpdate();
+        verifyNoInteractions(publishedUpdate);
         verify(entities, never()).createNativeQuery(contains("SET published_at="));
     }
 
