@@ -42,7 +42,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @Import(IntegrationTestBase.PeerConfiguration.class)
 public abstract class IntegrationTestBase {
     private static final class Infrastructure {
-        static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4");
+        // MySQL binary logging otherwise requires SUPER for CREATE TRIGGER even with schema-level TRIGGER rights.
+        static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.4")
+                .withCommand("--log-bin-trust-function-creators=1");
         static final RabbitMQContainer RABBIT = new RabbitMQContainer("rabbitmq:4.1-management");
         static {
             MYSQL.start();

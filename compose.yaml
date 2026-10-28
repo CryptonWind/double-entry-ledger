@@ -3,6 +3,8 @@ name: double-entry-ledger
 services:
   mysql:
     image: mysql:8.4
+    # Allow the schema migration user to create immutable-history triggers with binary logging enabled.
+    command: ["--log-bin-trust-function-creators=1"]
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: ledger

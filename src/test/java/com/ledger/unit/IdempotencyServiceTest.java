@@ -17,6 +17,8 @@ class IdempotencyServiceTest extends UnitTestBase {
     void executesOnceAndReplaysStoredStatusAndBody() {
         var request = new OpenAccount("EUR", null);
         var stored = mock(IdempotencyRecord.class);
+        // Mockito defaults boxed Integer results to 0; a new reservation must have SQL NULL status.
+        when(stored.getResponseStatus()).thenReturn(null);
         when(stored.getFingerprint()).thenReturn(json.fingerprint(request));
         when(entities.find(eq(IdempotencyRecord.class), any(IdempotencyRecord.Key.class), eq(LockModeType.PESSIMISTIC_WRITE)))
                 .thenReturn(stored);
@@ -45,6 +47,7 @@ class IdempotencyServiceTest extends UnitTestBase {
     void storesBusinessRefusalButDoesNotSwallowInfrastructureFailure() {
         var request = new OpenAccount("EUR", null);
         var stored = mock(IdempotencyRecord.class);
+        when(stored.getResponseStatus()).thenReturn(null);
         when(stored.getFingerprint()).thenReturn(json.fingerprint(request));
         when(entities.find(eq(IdempotencyRecord.class), any(IdempotencyRecord.Key.class), eq(LockModeType.PESSIMISTIC_WRITE)))
                 .thenReturn(stored);

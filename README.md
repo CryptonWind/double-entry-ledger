@@ -376,6 +376,15 @@ disables scheduled publication.
 
 ## Tests and verification
 
+MySQL development and test containers set log_bin_trust_function_creators=1 so
+Flyway can create the immutable-history triggers with schema-level permissions,
+without granting the application SUPER. For external/production MySQL, have the
+database administrator configure the appropriate migration privileges and binary
+logging policy. Runtime credentials should be separated from migration credentials.
+After changing compose.yaml, recreate the MySQL service using
+`docker compose up -d mysql`; the named data volume is preserved. Testcontainers
+applies the setting to each new test database automatically.
+
 Tests are run only when explicitly requested. mvn verify, Build17.cmd and
 run-all.ps1 run them when manually invoked. Application startup does not run tests.
 
