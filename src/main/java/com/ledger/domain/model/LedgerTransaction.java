@@ -34,12 +34,26 @@ public record LedgerTransaction(String id, String description, Instant recordedA
     public static LedgerTransaction record(String id, String description, List<Posting> postings,
             Map<String, Account> accounts, String reversesId, Instant now) {
         validateRequest(description, postings);
+        validateAccountsExist(postings, accounts);
+        String currency = accounts.get(postings.get(0).accountId()).getCurrency();
+        Map<String, BigDecimal> deltas = calculateBalancedDeltas(postings, accounts, currency);
+        validateResultingBalances(postings, accounts, deltas);
+        Instant at = determineRecordedAt(accounts, now);
+        List<Entry> entries = createEntries(postings, accounts, currency);
+        applyPostings(accounts, deltas, at);
+        return new LedgerTransaction(id, description, at, reversesId, currency, entries);
+    }
+
+    private static void validateAccountsExist(List<Posting> postings, Map<String, Account> accounts) {
         for (int i = 0; i < postings.size(); i++) {
             if (!accounts.containsKey(postings.get(i).accountId())) {
                 throw LedgerException.invalid("UNKNOWN_ACCOUNT", "entries[" + i + "].accountId", "Unknown account: " + postings.get(i).accountId());
             }
         }
-        String currency = accounts.get(postings.get(0).accountId()).getCurrency();
+    }
+
+    private static Map<String, BigDecimal> calculateBalancedDeltas(List<Posting> postings,
+            Map<String, Account> accounts, String currency) {
         Map<String, BigDecimal> deltas = new LinkedHashMap<>();
         BigDecimal total = BigDecimal.ZERO;
         for (int i = 0; i < postings.size(); i++) {
@@ -57,15 +71,29 @@ public record LedgerTransaction(String id, String description, Instant recordedA
         if (total.signum() != 0) {
             throw LedgerException.invalid("UNBALANCED_TRANSACTION", "entries", "Debits and credits must balance");
         }
-        Instant at = now.truncatedTo(ChronoUnit.MICROS);
+        return deltas;
+    }
+
+    private static void validateResultingBalances(List<Posting> postings, Map<String, Account> accounts,
+            Map<String, BigDecimal> deltas) {
         for (var account : accounts.values()) {
             int index = java.util.stream.IntStream.range(0, postings.size())
                     .filter(i -> postings.get(i).accountId().equals(account.getId())).findFirst().orElseThrow();
             account.validatePosting(deltas.get(account.getId()), "entries[" + index + "].accountId");
+        }
+    }
+
+    private static Instant determineRecordedAt(Map<String, Account> accounts, Instant now) {
+        Instant at = now.truncatedTo(ChronoUnit.MICROS);
+        for (var account : accounts.values()) {
             if (account.getLastPostedAt() != null && !at.isAfter(account.getLastPostedAt())) {
                 at = account.getLastPostedAt().plus(1, ChronoUnit.MICROS);
             }
         }
+        return at;
+    }
+
+    private static List<Entry> createEntries(List<Posting> postings, Map<String, Account> accounts, String currency) {
         Map<String, BigDecimal> running = new HashMap<>();
         accounts.forEach((key, value) -> running.put(key, value.getBalance()));
         List<Entry> entries = new ArrayList<>();
@@ -76,8 +104,13 @@ public record LedgerTransaction(String id, String description, Instant recordedA
             entries.add(new Entry(UUID.randomUUID().toString(), posting.accountId(), posting.direction(), amount,
                     after.setScale(MoneyRules.scale(currency))));
         }
-        for (var account : accounts.values()) account.post(deltas.get(account.getId()), at);
-        return new LedgerTransaction(id, description, at, reversesId, currency, entries);
+        return entries;
+    }
+
+    private static void applyPostings(Map<String, Account> accounts, Map<String, BigDecimal> deltas, Instant at) {
+        for (var account : accounts.values()) {
+            account.post(deltas.get(account.getId()), at);
+        }
     }
 
     public List<Posting> reversalPostings() {
