@@ -455,13 +455,15 @@ update affects one row; a lost lease produces a warning about possible duplicate
 ### Database initialization
 
 This is the application's initial version. Flyway initializes the database schema,
-settlement accounts, indexes and immutable-history guards from the SQL scripts.
-MySQL DDL is not transactional, so an interrupted initialization can leave a partial
-schema. The afterMigrateError callback attempts to restore history guards after a
-reported failure; it cannot run after a forced process termination or connection
-loss. Diagnose initialization failures and verify the tables and all four history
-triggers before starting application traffic. Local development data can be recreated
-when disposable; do not remove data that needs to be retained.
+settlement accounts, indexes and all four immutable-history guards from the single
+`V1__create_ledger.sql` script. The complete initial schema includes transaction
+currency, running balances, tracing and outbox leases. No backfills, temporary trigger
+removal or failure-restoration callback are needed.
+MySQL DDL is not transactional; diagnose interrupted initialization and verify the
+schema before starting traffic. Use a fresh database for this initial schema.
+Existing disposable development databases with a different Flyway history must be
+recreated; a clean build also removes obsolete SQL resources from target. Preserve
+any data you need before recreating a database. Testcontainers creates fresh databases.
 
 The default local profile is intentionally retained for IDE development. Both Docker
 instances explicitly select prod, so they never start Compose from inside the image.

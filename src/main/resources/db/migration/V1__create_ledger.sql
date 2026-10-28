@@ -4,6 +4,7 @@ CREATE TABLE accounts (
     overdraft_limit DECIMAL(24,2) NULL,
     balance DECIMAL(24,2) NOT NULL DEFAULT 0,
     created_at DATETIME(6) NOT NULL,
+    last_posted_at DATETIME(6) NULL,
     CONSTRAINT account_overdraft CHECK (overdraft_limit IS NULL OR overdraft_limit >= 0),
     CONSTRAINT account_balance CHECK (overdraft_limit IS NULL OR balance >= -overdraft_limit)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin;
@@ -13,6 +14,8 @@ CREATE TABLE ledger_transactions (
     description VARCHAR(500) NOT NULL,
     recorded_at DATETIME(6) NOT NULL,
     reverses_transaction_id VARCHAR(64) NULL,
+    currency VARCHAR(3) NOT NULL,
+    INDEX transaction_history (recorded_at, id),
     CONSTRAINT unique_reversal UNIQUE (reverses_transaction_id),
     CONSTRAINT reversal_original FOREIGN KEY (reverses_transaction_id) REFERENCES ledger_transactions(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin;
@@ -24,7 +27,7 @@ CREATE TABLE ledger_entries (
     account_id VARCHAR(64) NOT NULL,
     direction VARCHAR(6) NOT NULL,
     amount DECIMAL(24,2) NOT NULL,
-    balance_after DECIMAL(24,2) NOT NULL,
+    balance_after DECIMAL(28,2) NOT NULL,
     CONSTRAINT entry_transaction FOREIGN KEY (transaction_id) REFERENCES ledger_transactions(id),
     CONSTRAINT entry_account FOREIGN KEY (account_id) REFERENCES accounts(id),
     CONSTRAINT entry_position UNIQUE (transaction_id, position),
@@ -54,6 +57,11 @@ CREATE TABLE outbox_events (
     payload LONGTEXT NOT NULL,
     created_at DATETIME(6) NOT NULL,
     published_at DATETIME(6) NULL,
+    correlation_id VARCHAR(128) NOT NULL,
+    traceparent VARCHAR(55) NULL,
+    lease_token VARCHAR(64) NULL,
+    lease_until DATETIME(6) NULL,
+    INDEX outbox_claim (published_at, lease_until, created_at),
     INDEX pending_events (published_at, created_at, id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_bin;
 
@@ -68,3 +76,19 @@ INSERT INTO accounts (id, currency, overdraft_limit, balance, created_at) VALUES
     ('settlement-EUR', 'EUR', NULL, 0, UTC_TIMESTAMP(6)),
     ('settlement-USD', 'USD', NULL, 0, UTC_TIMESTAMP(6)),
     ('settlement-JPY', 'JPY', NULL, 0, UTC_TIMESTAMP(6));
+
+CREATE TRIGGER prevent_transaction_update
+BEFORE UPDATE ON ledger_transactions FOR EACH ROW
+SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Recorded transactions cannot be updated';
+
+CREATE TRIGGER prevent_transaction_delete
+BEFORE DELETE ON ledger_transactions FOR EACH ROW
+SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Recorded transactions cannot be deleted';
+
+CREATE TRIGGER prevent_entry_update
+BEFORE UPDATE ON ledger_entries FOR EACH ROW
+SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Recorded entries cannot be updated';
+
+CREATE TRIGGER prevent_entry_delete
+BEFORE DELETE ON ledger_entries FOR EACH ROW
+SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Recorded entries cannot be deleted';
