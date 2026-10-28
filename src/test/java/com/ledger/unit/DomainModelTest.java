@@ -2,7 +2,6 @@ package com.ledger.unit;
 
 import com.ledger.domain.model.Account;
 import com.ledger.domain.exception.LedgerException;
-import com.ledger.support.UnitTestBase;
 import com.ledger.domain.model.Direction;
 import com.ledger.domain.model.LedgerTransaction;
 import java.math.BigDecimal;
@@ -15,7 +14,7 @@ import org.junit.jupiter.api.Test;
 import static org.assertj.core.api.Assertions.*;
 
 /** The business model executes without JPA entities, repositories, Spring proxies or messaging. */
-class DomainModelTest extends UnitTestBase {
+class DomainModelTest {
     @Test
     void documentFlowRunsEntirelyInDomainObjects() {
         Instant now = Instant.parse("2026-10-28T12:00:00Z");

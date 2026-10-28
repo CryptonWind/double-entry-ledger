@@ -1,44 +1,50 @@
 package com.ledger.unit;
 
-import com.ledger.domain.model.Account;
-import com.ledger.domain.service.MoneyRules;
-import com.ledger.domain.model.Direction;
-import com.ledger.domain.model.LedgerTransaction;
-import com.ledger.application.AccountService;
-import com.ledger.application.AccountHistoryService;
-import com.ledger.application.PaymentService;
-import com.ledger.application.LedgerService;
-import com.ledger.support.UnitTestBase;
-import java.lang.reflect.Modifier;
-import java.util.List;
+import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
 import org.junit.jupiter.api.Test;
 
-import static org.assertj.core.api.Assertions.*;
+import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.*;
 
-class ArchitectureTest extends UnitTestBase {
+/** Bytecode-level checks include imports, method calls, field types, annotations and signatures. No Spring context. */
+class ArchitectureTest {
+    private static final JavaClasses CLASSES = new ClassFileImporter()
+            .withImportOption(ImportOption.Predefined.DO_NOT_INCLUDE_TESTS).importPackages("com.ledger");
+
     @Test
-    void domainHasNoRuntimeFrameworkAnnotationsOrInfrastructureFields() {
-        for (var type : List.of(Account.class, MoneyRules.class, LedgerTransaction.class, Direction.class)) {
-            assertThat(type.getAnnotations()).allMatch(annotation -> !annotation.annotationType().getName().startsWith("jakarta.")
-                    && !annotation.annotationType().getName().startsWith("org.springframework."));
-            for (var field : type.getDeclaredFields()) {
-                assertThat(field.getType().getName()).doesNotContain("infrastructure", "jakarta.persistence", "org.springframework");
-            }
-        }
+    void domainDependsOnlyOnItselfAndJava() {
+        classes().that().resideInAPackage("com.ledger.domain..")
+                .should().onlyDependOnClassesThat().resideInAnyPackage("com.ledger.domain..", "java..", "lombok..")
+                .check(CLASSES);
     }
 
     @Test
-    void businessServicesDependOnPortsNotJpaOrConcreteAdapters() {
-        for (var type : List.of(AccountService.class, AccountHistoryService.class, LedgerService.class, PaymentService.class)) {
-            assertThat(type.getAnnotations()).allMatch(annotation -> !annotation.annotationType().getName().startsWith("org.springframework."));
-            for (var field : type.getDeclaredFields()) {
-                if (Modifier.isStatic(field.getModifiers())) continue;
-                assertThat(field.getType().isInterface()).as("%s.%s must depend on an interface", type.getSimpleName(), field.getName()).isTrue();
-                assertThat(field.getType().getName()).doesNotContain("infrastructure", "jakarta.persistence", "org.springframework");
-            }
-            for (var method : type.getDeclaredMethods()) {
-                assertThat(method.getAnnotations()).allMatch(annotation -> !annotation.annotationType().getName().startsWith("org.springframework."));
-            }
-        }
+    void applicationNeverDependsOnInfrastructureOrFrameworkImplementations() {
+        noClasses().that().resideInAPackage("com.ledger.application..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.ledger.infrastructure..", "jakarta..",
+                        "org.springframework..", "org.hibernate..", "com.rabbitmq..", "tools.jackson..")
+                .check(CLASSES);
+    }
+
+    @Test
+    void persistenceEntitiesAreConfinedToOutputPersistence() {
+        classes().that().areAnnotatedWith(jakarta.persistence.Entity.class)
+                .should().resideInAPackage("com.ledger.infrastructure.output.persistence..")
+                .check(CLASSES);
+        noClasses().that().resideOutsideOfPackage("com.ledger.infrastructure..")
+                .should().dependOnClassesThat().areAnnotatedWith(jakarta.persistence.Entity.class)
+                .check(CLASSES);
+    }
+
+    @Test
+    void controllersDoNotCallConcreteApplicationServicesOrPersistence() {
+        noClasses().that().areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
+                .should().accessClassesThat().haveSimpleNameEndingWith("Service")
+                .check(CLASSES);
+        noClasses().that().resideInAPackage("com.ledger.infrastructure.input.rest..")
+                .should().dependOnClassesThat().resideInAnyPackage("com.ledger.infrastructure.output.persistence..",
+                        "jakarta.persistence..", "org.springframework.data..")
+                .check(CLASSES);
     }
 }

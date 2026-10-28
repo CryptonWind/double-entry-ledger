@@ -2,7 +2,6 @@ package com.ledger.unit;
 
 import com.ledger.application.port.out.AccountStore;
 import com.ledger.domain.model.Account;
-import com.ledger.support.UnitTestBase;
 import com.ledger.application.LedgerService;
 import com.ledger.application.model.LedgerModels.*;
 import com.ledger.application.port.out.TransactionAnnouncements;
@@ -19,13 +18,15 @@ import org.mockito.ArgumentCaptor;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-class LedgerUseCasePortsTest extends UnitTestBase {
+class LedgerUseCasePortsTest {
     @Test
     void useCaseCoordinatesPortsWithoutKnowingHibernateOrRabbitMq() {
         AccountStore accounts = mock(AccountStore.class);
         TransactionStore transactions = mock(TransactionStore.class);
         TransactionAnnouncements announcements = mock(TransactionAnnouncements.class);
-        var useCase = new LedgerService(accounts, transactions, announcements, directWork());
+        var useCase = new LedgerService(accounts, transactions, announcements, new com.ledger.application.port.out.UnitOfWork() {
+            @Override public <T> T execute(java.util.function.Supplier<T> action) { return action.get(); }
+        });
         var settlement = new Account("settlement-EUR", "EUR", null, BigDecimal.ZERO, Instant.EPOCH, null);
         var merchant = Account.open("merchant-42", "EUR", null, Instant.EPOCH);
         when(accounts.lock(settlement.getId())).thenReturn(Optional.of(settlement));

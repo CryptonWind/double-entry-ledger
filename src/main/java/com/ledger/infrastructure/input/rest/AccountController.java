@@ -5,7 +5,7 @@ import com.ledger.application.AccountHistoryService;
 import com.ledger.application.port.in.AccountHistoryUseCases;
 import java.time.Instant;
 import org.springframework.format.annotation.DateTimeFormat;
-import com.ledger.application.IdempotencyService;
+import com.ledger.application.port.in.IdempotentOperations;
 import com.ledger.application.model.LedgerModels.AccountView;
 import com.ledger.application.model.LedgerModels.OpenAccount;
 import jakarta.validation.Valid;
@@ -29,7 +29,7 @@ public class AccountController {
     public record OpenAccountRequest(@jakarta.validation.constraints.NotBlank(message = "Currency is required")
                                      String currency, java.math.BigDecimal overdraftLimit) { }
     private final AccountUseCases accounts;
-    private final IdempotencyService idempotency;
+    private final IdempotentOperations idempotency;
     private final AccountHistoryUseCases history;
 
     @PostMapping

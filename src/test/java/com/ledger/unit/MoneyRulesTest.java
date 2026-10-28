@@ -2,7 +2,6 @@ package com.ledger.unit;
 
 import com.ledger.domain.service.MoneyRules;
 import com.ledger.domain.exception.LedgerException;
-import com.ledger.support.UnitTestBase;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -12,7 +11,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.assertj.core.api.Assertions.*;
 
-class MoneyRulesTest extends UnitTestBase {
+class MoneyRulesTest {
     @ParameterizedTest
     @CsvSource({"EUR,125.50,2", "USD,98.50,2", "JPY,15000,0"})
     void acceptsDocumentAmountsWithCurrencyPrecision(String currency, String amount, int scale) {

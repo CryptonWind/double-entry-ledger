@@ -29,7 +29,7 @@ public class PaymentService implements com.ledger.application.port.in.SettlePaym
     private record PaymentIdentity(String merchantAccountId, BigDecimal amount, String currency) { }
 
     public String settle(PaymentSettled payment) {
-        if (payment.eventId() == null || payment.eventId().isBlank() || payment.eventId().length() > 128
+        if (payment == null || payment.eventId() == null || payment.eventId().isBlank() || payment.eventId().length() > 128
                 || payment.paymentId() == null || !payment.paymentId().matches("[A-Za-z0-9._:-]{1,128}")
                 || payment.merchantAccountId() == null || payment.merchantAccountId().isBlank()
                 || payment.merchantAccountId().length() > 64) {

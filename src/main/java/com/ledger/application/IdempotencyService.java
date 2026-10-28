@@ -8,15 +8,14 @@ import java.util.function.Supplier;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import com.ledger.application.port.out.IdempotencyStore;
+import com.ledger.application.port.in.IdempotentOperations;
 
 @RequiredArgsConstructor
 @Log4j2
-public class IdempotencyService {
+public class IdempotencyService implements IdempotentOperations {
     private final IdempotencyStore store;
     private final JsonCodec json;
     private final UnitOfWork transactions;
-
-    public record StoredResponse(int status, String body) { }
 
     public StoredResponse execute(String scope, String key, Object request, Supplier<?> operation) {
         if (key == null || !key.matches("[A-Za-z0-9._:-]{1,128}")) {

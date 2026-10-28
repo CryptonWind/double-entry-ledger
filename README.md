@@ -119,6 +119,7 @@ Application services orchestrate business objects through input/output ports:
 | AccountHistoryUseCases | AccountHistoryService | AccountHistoryReader, AccountUseCases |
 | TransactionUseCases | LedgerService | AccountStore, TransactionStore, TransactionAnnouncements |
 | SettlePayment | PaymentService | PaymentStore, AccountStore, TransactionUseCases, UnitOfWork, JsonCodec |
+| IdempotentOperations | IdempotencyService | IdempotencyStore, UnitOfWork, JsonCodec |
 
 Controllers depend on input ports and map validated transport requests to plain
 application commands. Bean Validation annotations remain in REST request DTOs,
@@ -406,7 +407,7 @@ src/test/java/com/ledger/
   integration/DocumentExamplesIntegrationTest.java  Literal challenge examples on real infrastructure
 ```
 
-Every unit class extends UnitTestBase and uses the exact same configuration,
+Adapter-focused unit classes extend UnitTestBase and use the exact same configuration,
 allowing Spring's context cache to initialize it once per test JVM. There is no
 Boot auto-configuration or real database/broker in that context. Shared Mockito
 infrastructure mocks are reset before each test. These are service-level logic
@@ -429,10 +430,14 @@ OutboxPublisher, PaymentConsumer, HibernateDatabase, MoneyRules, JSON fingerprin
 trace context and HTTP trace filtering. Assertions use the challenge's exact values:
 125.50 settlement, 100.00 merchant debit, 98.50 payout, 1.50 fee, 25.50 remaining,
 the refused 50.00 debit yielding -24.50, and 15000/100.5 JPY examples.
-DomainModelTest also executes the complete financial scenario using only business
-models, with no JPA calls. ArchitectureTest guards domain framework independence
-and interface-based dependencies for business services. Adapter-focused service
-tests retain mocked JPA boundaries to verify mapping and use-case orchestration.
+DomainModelTest and MoneyRulesTest execute without Spring. LedgerUseCasePortsTest,
+IsolatedUseCasesTest and ControllerPortsTest exercise core orchestration and input
+mapping with ports only, without JPA/RabbitMQ setup. ArchitectureTest uses ArchUnit
+to inspect dependencies, method calls, annotations and entity references throughout
+the compiled code. Lombok's generated compile-time annotations are allowed; runtime
+domain framework dependencies are not. Adapter-focused tests retain mocked JPA
+boundaries. FailureRecoveryIntegrationTest covers invalid-account/currency quarantine,
+following valid payments and retained outbox state after unroutable publication.
 
 Explicit execution commands, when requested:
 
@@ -449,7 +454,7 @@ Java 17 source/test compilation succeeded with mvn test-compile. No tests or
 containers were started for the shared test-infrastructure reorganization or
 the Hibernate/history/OpenAPI/tracing additions.
 Earlier 12-test runs passed before these changes; they do not verify this version.
-See docs/IMPLEMENTATION_REVIEW.md. All migrations need explicit execution testing.
+All migrations need explicit execution testing.
 
 ## AI usage
 

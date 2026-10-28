@@ -1,6 +1,6 @@
 package com.ledger.infrastructure.input.rest;
 
-import com.ledger.application.IdempotencyService;
+import com.ledger.application.port.in.IdempotentOperations;
 import com.ledger.domain.exception.LedgerException;
 import com.ledger.application.model.LedgerModels.RecordTransaction;
 import com.ledger.application.model.LedgerModels.TransactionView;
@@ -24,7 +24,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @DocumentedErrors
 public class TransactionController {
     private final TransactionUseCases ledger;
-    private final IdempotencyService idempotency;
+    private final IdempotentOperations idempotency;
 
     @PostMapping
     @Operation(operationId = "recordTransaction", summary = "Record a balanced transaction atomically",
@@ -65,7 +65,7 @@ public class TransactionController {
         return ledger.get(id);
     }
 
-    private ResponseEntity<String> response(IdempotencyService.StoredResponse result) {
+    private ResponseEntity<String> response(IdempotentOperations.StoredResponse result) {
         return ResponseEntity.status(result.status()).contentType(MediaType.APPLICATION_JSON).body(result.body());
     }
 }
