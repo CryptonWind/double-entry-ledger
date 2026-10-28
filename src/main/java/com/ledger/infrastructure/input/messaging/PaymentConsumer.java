@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.slf4j.MDC;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
@@ -41,8 +42,8 @@ public class PaymentConsumer {
                 if (payment == null) {
                     throw LedgerException.invalid("INVALID_PAYMENT", "body", "Payment must be an object");
                 }
-                if (payment.paymentId() != null) org.slf4j.MDC.put("paymentId", payment.paymentId());
-                if (payment.eventId() != null) org.slf4j.MDC.put("sourceEventId", payment.eventId());
+                if (payment.paymentId() != null) MDC.put("paymentId", payment.paymentId());
+                if (payment.eventId() != null) MDC.put("sourceEventId", payment.eventId());
                 String transactionId = payments.settle(payment);
                 log.info("Payment settled paymentId={} eventId={} transactionId={}",
                         payment.paymentId(), payment.eventId(), transactionId);
@@ -55,13 +56,11 @@ public class PaymentConsumer {
 
     private void quarantine(String payload, RuntimeException failure) {
         String id = UUID.randomUUID().toString();
-        String reason = failure.getMessage() == null ? failure.getClass().getSimpleName() : failure.getMessage();
-        if (reason.length() > 2000) {
-            reason = reason.substring(0, 2000);
-        }
-        String failureReason = reason;
+        String reason = java.util.Optional.ofNullable(failure.getMessage())
+                .orElseGet(() -> failure.getClass().getSimpleName())
+                .transform(message -> message.substring(0, Math.min(message.length(), 2000)));
         transactions.execute(() -> {
-            entities.persist(new FailedPaymentMessage(id, payload, failureReason, Instant.now()));
+            entities.persist(new FailedPaymentMessage(id, payload, reason, Instant.now()));
             return null;
         });
         // Confirm DLQ delivery before returning (and therefore before ACK of the original).
