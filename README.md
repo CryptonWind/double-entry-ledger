@@ -191,8 +191,6 @@ it using ddl-auto: validate. Open EntityManager in View is disabled.
 - Reversals create new transactions, flip all entries and reference the original.
   A transaction can be reversed once; a reversal cannot be reversed.
 - Hibernate @Immutable and MySQL triggers reject history updates/deletes.
-  V4 explicitly backfills earlier running balances during a controlled migration;
-  previously serialized idempotency responses/outbox messages retain their content.
 
 ### Transactions and concurrency
 
@@ -241,8 +239,7 @@ target/generated-sources; IntelliJ can import it after Maven reload/generation.
 A changed interface makes incompatible implementations fail compilation.
 Springdoc also exposes /v3/api-docs[.yaml] from the generated interface annotations.
 Generation does not start the application, containers or tests.
-The original prototype was code-first; API evolution is contract-first from this
-migration onward. This does not retroactively change the original development order.
+The API contract defines the REST interfaces and DTOs for this initial version.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -443,25 +440,22 @@ a rollback-only marker for a caught business refusal. Standalone jobs/listeners 
 invoke them safely as well. Outbox completion logs success only when the token-checked
 update affects one row; a lost lease produces a warning about possible duplicates.
 
-### Migration failure recovery
+### Database initialization
 
-Run schema/data migrations with application traffic stopped and one designated
-migration runner. MySQL DDL is not transactional. V4/V5 temporarily remove update
-guards for explicit backfills. The afterMigrateError callback reinstates all history
-guards on a reported migration failure without changing applied migration checksums.
-If the process is killed or the DB connection is lost, callbacks cannot guarantee
-execution: keep writers stopped, run the callback SQL manually after reconnecting,
-inspect SHOW TRIGGERS and partial schema/data changes, then repair Flyway history only
-after diagnosis and complete the migration. A failed initial schema creation may
-require restoring the tables before running the guard script. Do not restart traffic
-until migration success and all four triggers are confirmed. The callback mitigates
-normal migration failures; it does not claim atomic DDL or recovery from server loss.
+This is the application's initial version. Flyway initializes the database schema,
+settlement accounts, indexes and immutable-history guards from the SQL scripts.
+MySQL DDL is not transactional, so an interrupted initialization can leave a partial
+schema. The afterMigrateError callback attempts to restore history guards after a
+reported failure; it cannot run after a forced process termination or connection
+loss. Diagnose initialization failures and verify the tables and all four history
+triggers before starting application traffic. Local development data can be recreated
+when disposable; do not remove data that needs to be retained.
 
 The default local profile is intentionally retained for IDE development. Both Docker
 instances explicitly select prod, so they never start Compose from inside the image.
 External deployments must set SPRING_PROFILES_ACTIVE=prod explicitly.
-V5 persists transaction currency and adds outbox leases. Currency is no longer inferred
-from account state. Account restoration validates identity/currency/precision/overdraft;
+Transactions store their currency explicitly, and outbox records store publication leases.
+Account restoration validates identity/currency/precision/overdraft;
 the full constructor is private. Transaction posting touches only referenced accounts.
 
 ### Linux/macOS examples
@@ -504,8 +498,8 @@ disables scheduled publication.
 MySQL development and test containers set log_bin_trust_function_creators=1 so
 Flyway can create the immutable-history triggers with schema-level permissions,
 without granting the application SUPER. For external/production MySQL, have the
-database administrator configure the appropriate migration privileges and binary
-logging policy. Runtime credentials should be separated from migration credentials.
+database administrator configure the appropriate schema-initialization privileges and binary
+logging policy. Runtime credentials should be separated from schema-management credentials.
 After changing compose.yaml, recreate the MySQL service using
 `docker compose up -d mysql`; the named data volume is preserved. Testcontainers
 applies the setting to each new test database automatically.
@@ -578,7 +572,7 @@ Java 17 source/test compilation succeeded with mvn test-compile. No tests or
 containers were started for the shared test-infrastructure reorganization or
 the Hibernate/history/OpenAPI/tracing additions.
 Earlier 12-test runs passed before these changes; they do not verify this version.
-All migrations need explicit execution testing.
+Database initialization needs explicit execution testing.
 
 ## AI usage
 
@@ -586,7 +580,7 @@ See AI_USAGE.md for AI-assisted work and verification notes.
 
 ## Improvements
 
-- Explicitly execute the current integration suite and verify all Flyway migrations.
+- Explicitly execute the current integration suite and verify database initialization.
 - Process-kill/network/broker-outage tests beyond simulated failure windows.
 - Production operations for parked-payment replay and lease/retry backlog monitoring.
 - OpenAPI response/schema validation in CI and source-contract/live contract drift checks.
