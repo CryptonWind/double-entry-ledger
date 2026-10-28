@@ -42,15 +42,20 @@ class MessagingLogicTest extends UnitTestBase {
         when(entities.createNativeQuery(anyString(), eq(OutboxEvent.class))).thenReturn(query);
         var event = new OutboxEvent("event", "{}", Instant.now(), null, "correlation", null);
         when(query.getResultList()).thenReturn(List.of(event), List.of());
+        Query update = mock(Query.class, RETURNS_SELF);
+        when(entities.createNativeQuery(anyString())).thenReturn(update);
         confirm(true, false);
         outbox.publishPending();
-        assertThat(event.getPublishedAt()).isNotNull();
+        verify(update).setParameter(eq("id"), eq("event"));
+        verify(entities).createNativeQuery(contains("SET published_at="));
         var pending = new OutboxEvent("pending", "{}", Instant.now(), null, "correlation", null);
-        when(query.getResultList()).thenReturn(List.of(pending));
+        when(query.getResultList()).thenReturn(List.of(pending), List.of());
+        clearInvocations(entities);
         reset(rabbit);
         confirm(false, false);
         outbox.publishPending();
         assertThat(pending.getPublishedAt()).isNull();
+        verify(entities, never()).createNativeQuery(contains("SET published_at="));
     }
 
     @Test

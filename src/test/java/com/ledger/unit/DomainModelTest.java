@@ -18,7 +18,7 @@ class DomainModelTest {
     @Test
     void documentFlowRunsEntirelyInDomainObjects() {
         Instant now = Instant.parse("2026-10-28T12:00:00Z");
-        var settlement = new Account("settlement", "EUR", null, BigDecimal.ZERO, now, null);
+        var settlement = Account.restore("settlement", "EUR", null, BigDecimal.ZERO, now, null);
         var merchant = Account.open("merchant-42", "EUR", null, now);
         var payouts = Account.open("payouts", "EUR", null, now);
         var fees = Account.open("fees", "EUR", null, now);
@@ -48,5 +48,27 @@ class DomainModelTest {
 
     private LedgerTransaction.Posting post(String id, Direction direction, String value) {
         return new LedgerTransaction.Posting(id, direction, new BigDecimal(value));
+    }
+
+    @Test
+    void unrelatedAccountsAreNotValidatedOrMutatedAndMissingAccountsLeaveStateIntact() {
+        var source = Account.restore("source", "EUR", null, BigDecimal.ZERO, Instant.EPOCH, null);
+        var target = Account.open("target", "EUR", null, Instant.EPOCH);
+        var unrelated = Account.open("unrelated", "JPY", null, Instant.EPOCH);
+        var postings = List.of(post("source", Direction.DEBIT, "125.50"), post("target", Direction.CREDIT, "125.50"));
+        LedgerTransaction.record("tx", "Settlement", postings, Map.of("source", source, "target", target, "unrelated", unrelated), null, Instant.now());
+        assertThat(unrelated.getBalance()).isEqualByComparingTo("0");
+        assertThat(unrelated.getLastPostedAt()).isNull();
+        assertThatThrownBy(() -> LedgerTransaction.record("missing", "Missing", postings, Map.of("source", source), null, Instant.now()))
+                .isInstanceOf(LedgerException.class);
+        assertThat(source.getBalance()).isEqualByComparingTo("-125.50");
+    }
+
+    @Test
+    void invalidRestoredStateCannotBypassAccountInvariants() {
+        assertThatThrownBy(() -> Account.restore("id", null, null, BigDecimal.ZERO, Instant.EPOCH, null)).isInstanceOf(LedgerException.class);
+        assertThatThrownBy(() -> Account.restore("id", "JPY", null, new BigDecimal("1.5"), Instant.EPOCH, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Account.restore("id", "EUR", BigDecimal.ZERO, new BigDecimal("-1"), Instant.EPOCH, null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> Account.open("", "EUR", null, Instant.EPOCH)).isInstanceOf(IllegalArgumentException.class);
     }
 }

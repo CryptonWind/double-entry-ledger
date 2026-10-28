@@ -39,8 +39,12 @@ class ArchitectureTest {
 
     @Test
     void controllersDoNotCallConcreteApplicationServicesOrPersistence() {
+        var concreteApplicationServices = com.tngtech.archunit.base.DescribedPredicate
+                .<com.tngtech.archunit.core.domain.JavaClass>describe("are concrete application services",
+                        type -> type.getPackageName().startsWith("com.ledger.application")
+                                && !type.isInterface() && type.getSimpleName().endsWith("Service"));
         noClasses().that().areAnnotatedWith(org.springframework.web.bind.annotation.RestController.class)
-                .should().accessClassesThat().haveSimpleNameEndingWith("Service")
+                .should().accessClassesThat(concreteApplicationServices)
                 .check(CLASSES);
         noClasses().that().resideInAPackage("com.ledger.infrastructure.input.rest..")
                 .should().dependOnClassesThat().resideInAnyPackage("com.ledger.infrastructure.output.persistence..",

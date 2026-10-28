@@ -35,12 +35,15 @@ public record LedgerTransaction(String id, String description, Instant recordedA
             Map<String, Account> accounts, String reversesId, Instant now) {
         validateRequest(description, postings);
         validateAccountsExist(postings, accounts);
+        // Only touched accounts participate; unrelated caller-supplied accounts are never mutated.
+        Map<String, Account> affected = new LinkedHashMap<>();
+        postings.forEach(posting -> affected.put(posting.accountId(), accounts.get(posting.accountId())));
         String currency = accounts.get(postings.get(0).accountId()).getCurrency();
-        Map<String, BigDecimal> deltas = calculateBalancedDeltas(postings, accounts, currency);
-        validateResultingBalances(postings, accounts, deltas);
-        Instant at = determineRecordedAt(accounts, now);
-        List<Entry> entries = createEntries(postings, accounts, currency);
-        applyPostings(accounts, deltas, at);
+        Map<String, BigDecimal> deltas = calculateBalancedDeltas(postings, affected, currency);
+        validateResultingBalances(postings, affected, deltas);
+        Instant at = determineRecordedAt(affected, now);
+        List<Entry> entries = createEntries(postings, affected, currency);
+        applyPostings(affected, deltas, at);
         return new LedgerTransaction(id, description, at, reversesId, currency, entries);
     }
 

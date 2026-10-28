@@ -1,5 +1,6 @@
 services:
   app:
+    x-description: First application instance
     build:
       context: .
       target: application
@@ -17,6 +18,24 @@ services:
       mysql:
         condition: service_healthy
       rabbitmq:
+        condition: service_healthy
+
+  app-2:
+    build:
+      context: .
+      target: application
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MYSQL_URL: jdbc:mysql://mysql:3306/ledger
+      MYSQL_USERNAME: ledger
+      MYSQL_PASSWORD: ledger
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ledger
+      RABBITMQ_PASSWORD: ledger
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      app:
         condition: service_healthy
 
   tests:

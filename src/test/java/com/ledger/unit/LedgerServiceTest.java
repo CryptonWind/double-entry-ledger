@@ -49,7 +49,7 @@ class LedgerServiceTest extends UnitTestBase {
         assertThat(fees.getBalance()).isEqualByComparingTo("1.50");
         assertZeroTotal();
 
-        var originalEntity = new LedgerTransactionEntity(original.id(), original.description(), original.recordedAt(), null);
+        var originalEntity = new LedgerTransactionEntity(original.id(), original.description(), original.recordedAt(), null, "EUR");
         when(entities.find(LedgerTransactionEntity.class, original.id(), LockModeType.PESSIMISTIC_WRITE)).thenReturn(originalEntity);
         when(entryRepository.findByTransactionIdOrderByPosition(original.id())).thenReturn(List.of(
                 storedEntry(original.id(), 0, merchant.getId(), "DEBIT", "100.00"),
@@ -122,14 +122,14 @@ class LedgerServiceTest extends UnitTestBase {
     void rejectsSecondReversalReversalOfReversalAndMissingOriginal() {
         String id = "original";
         when(entities.find(LedgerTransactionEntity.class, id, LockModeType.PESSIMISTIC_WRITE))
-                .thenReturn(new LedgerTransactionEntity(id, "Original", Instant.now(), null));
+                .thenReturn(new LedgerTransactionEntity(id, "Original", Instant.now(), null, "EUR"));
         when(transactionRepository.existsByReversesTransactionId(id)).thenReturn(true);
         when(entryRepository.findByTransactionIdOrderByPosition(id)).thenReturn(List.of(
                 storedEntry(id, 0, settlement.getId(), "DEBIT", "125.50"),
                 storedEntry(id, 1, merchant.getId(), "CREDIT", "125.50")));
         assertError(() -> ledger.reverse(id), "ALREADY_REVERSED");
         when(entities.find(LedgerTransactionEntity.class, "reversal", LockModeType.PESSIMISTIC_WRITE))
-                .thenReturn(new LedgerTransactionEntity("reversal", "Reversal", Instant.now(), id));
+                .thenReturn(new LedgerTransactionEntity("reversal", "Reversal", Instant.now(), id, "EUR"));
         when(entryRepository.findByTransactionIdOrderByPosition("reversal")).thenReturn(List.of(
                 storedEntry("reversal", 0, settlement.getId(), "CREDIT", "125.50"),
                 storedEntry("reversal", 1, merchant.getId(), "DEBIT", "125.50")));
@@ -152,7 +152,7 @@ class LedgerServiceTest extends UnitTestBase {
         fundAfterDocumentPayout();
         payout.postBalance(BigDecimal.ZERO, Instant.now());
         when(entities.find(LedgerTransactionEntity.class, "original", LockModeType.PESSIMISTIC_WRITE))
-                .thenReturn(new LedgerTransactionEntity("original", "Payout", Instant.now(), null));
+                .thenReturn(new LedgerTransactionEntity("original", "Payout", Instant.now(), null, "EUR"));
         when(entryRepository.findByTransactionIdOrderByPosition("original")).thenReturn(List.of(
                 storedEntry("original", 0, merchant.getId(), "DEBIT", "100.00"),
                 storedEntry("original", 1, payout.getId(), "CREDIT", "98.50"),
@@ -175,7 +175,7 @@ class LedgerServiceTest extends UnitTestBase {
     @Test
     void readsBackImmutableTransactionAndItsEntries() {
         Instant at = Instant.parse("2026-10-28T12:00:00Z");
-        when(transactionRepository.findById("tx")).thenReturn(Optional.of(new LedgerTransactionEntity("tx", "Settlement", at, null)));
+        when(transactionRepository.findById("tx")).thenReturn(Optional.of(new LedgerTransactionEntity("tx", "Settlement", at, null, "EUR")));
         when(entryRepository.findByTransactionIdOrderByPosition("tx")).thenReturn(List.of(
                 storedEntry("tx", 0, settlement.getId(), "DEBIT", "125.50"),
                 storedEntry("tx", 1, merchant.getId(), "CREDIT", "125.50")));

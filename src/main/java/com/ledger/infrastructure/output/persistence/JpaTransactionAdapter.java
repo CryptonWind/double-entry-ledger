@@ -26,7 +26,7 @@ public class JpaTransactionAdapter implements TransactionStore {
     @Override public boolean hasReversal(String id) { return repository.existsByReversesTransactionId(id); }
     @Override public void append(LedgerTransaction transaction) {
         entities.persist(new LedgerTransactionEntity(transaction.id(), transaction.description(), transaction.recordedAt(),
-                transaction.reversesTransactionId()));
+                transaction.reversesTransactionId(), transaction.currency()));
         entities.flush();
         int position = 0;
         for (var entry : transaction.entries()) {
@@ -37,8 +37,8 @@ public class JpaTransactionAdapter implements TransactionStore {
     }
     private LedgerTransaction toDomain(LedgerTransactionEntity entity) {
         var stored = entries.findByTransactionIdOrderByPosition(entity.getId());
-        // Scalar lookup avoids loading stale account state before ordered write locks during reversal.
-        String currency = accounts.currency(stored.get(0).getAccountId()).orElseThrow();
+        // Transaction currency is persisted explicitly; reads do not load account state.
+        String currency = entity.getCurrency();
         int scale = MoneyRules.scale(currency);
         return new LedgerTransaction(entity.getId(), entity.getDescription(), entity.getRecordedAt(), entity.getReversesTransactionId(),
                 currency, stored.stream().map(e -> new LedgerTransaction.Entry(e.getId(), e.getAccountId(),

@@ -27,7 +27,7 @@ class LedgerUseCasePortsTest {
         var useCase = new DefaultLedgerService(accounts, transactions, announcements, new com.ledger.application.port.out.UnitOfWork() {
             @Override public <T> T execute(java.util.function.Supplier<T> action) { return action.get(); }
         });
-        var settlement = new Account("settlement-EUR", "EUR", null, BigDecimal.ZERO, Instant.EPOCH, null);
+        var settlement = Account.restore("settlement-EUR", "EUR", null, BigDecimal.ZERO, Instant.EPOCH, null);
         var merchant = Account.open("merchant-42", "EUR", null, Instant.EPOCH);
         when(accounts.lock(settlement.getId())).thenReturn(Optional.of(settlement));
         when(accounts.lock(merchant.getId())).thenReturn(Optional.of(merchant));

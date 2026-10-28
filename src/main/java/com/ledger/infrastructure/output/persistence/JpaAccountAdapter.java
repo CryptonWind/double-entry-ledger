@@ -28,7 +28,7 @@ public class JpaAccountAdapter implements AccountStore {
         entity.postBalance(account.getBalance(), account.getLastPostedAt());
     }
     private Account toDomain(AccountEntity entity) {
-        return new Account(entity.getId(), entity.getCurrency(), entity.getOverdraftLimit(), entity.getBalance(),
+        return Account.restore(entity.getId(), entity.getCurrency(), entity.getOverdraftLimit(), entity.getBalance(),
                 entity.getCreatedAt(), entity.getLastPostedAt());
     }
 }

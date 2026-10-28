@@ -16,6 +16,35 @@ import static org.awaitility.Awaitility.await;
 
 class FailureRecoveryIntegrationTest extends IntegrationTestBase {
     @Test
+    void brokerConfirmationDoesNotHoldDatabaseTransaction() {
+        String merchant = account("EUR");
+        record(transfer("settlement-EUR", merchant, "1.00"));
+        var confirming = new com.ledger.infrastructure.output.messaging.ConfirmedPublisher(rabbit) {
+            @Override public void publish(String exchange, String routing, String id, String payload) {
+                assertThat(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+                super.publish(exchange, routing, id, payload);
+            }
+        };
+        new OutboxPublisher(entities, transactionTemplate, confirming).publishPending();
+        assertIntegrity();
+    }
+    @Test
+    void unexpiredLeaseIsSkippedAndExpiredLeaseCanBeRecoveredByAnotherWorker() {
+        String merchant = account("EUR");
+        var transaction = json.read(record(transfer("settlement-EUR", merchant, "1.00")).body(), TransactionView.class);
+        var row = database.queryForMap("SELECT id FROM outbox_events WHERE payload LIKE ?", "%" + transaction.id() + "%");
+        String id = (String) row.get("id");
+        database.update("UPDATE outbox_events SET lease_token='crashed-worker', lease_until=TIMESTAMPADD(MINUTE,5,UTC_TIMESTAMP(6)) WHERE id=?", id);
+        var worker = new OutboxPublisher(entities, transactionTemplate, publisher);
+        worker.publishPending();
+        assertThat(database.queryForObject("SELECT published_at FROM outbox_events WHERE id=?", java.sql.Timestamp.class, id)).isNull();
+        database.update("UPDATE outbox_events SET lease_until=TIMESTAMPADD(SECOND,-1,UTC_TIMESTAMP(6)) WHERE id=?", id);
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            worker.publishPending();
+            assertThat(database.queryForObject("SELECT published_at FROM outbox_events WHERE id=?", java.sql.Timestamp.class, id)).isNotNull();
+        });
+    }
+    @Test
     void unknownAndWrongCurrencyPaymentsAreQuarantinedBeforeFollowingValidPayment() {
         String merchant = account("EUR");
         long failuresBefore = database.queryForObject("SELECT COUNT(*) FROM failed_payment_messages", Long.class);

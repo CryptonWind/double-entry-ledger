@@ -26,4 +26,6 @@ public class LedgerTransactionEntity {
     private Instant recordedAt;
     @Column(length = 64)
     private String reversesTransactionId;
+    @Column(nullable = false, length = 3)
+    private String currency;
 }

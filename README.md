@@ -4,10 +4,21 @@ Java 17, Spring Boot 4, Spring Data JPA/Hibernate, MySQL 8.4, Flyway and RabbitM
 Credits increase balances; debits decrease them. Accounts start at zero. Money
 moves only through balanced, immutable transactions.
 
+> **Important: authentication and authorization are intentionally not implemented.**
+> They are not required by the challenge. Restrict access to the API and broker;
+> production deployment must add identity, authorization and settlement-account policies.
+
 ## Running
 
-Required: Docker with Linux containers, Git and JDK 17. Rancher Desktop must use
-the Moby engine and be running. From the project root:
+Required: Docker with Linux containers and Compose, Git and JDK 17. Any compatible
+Docker environment can be used; Rancher Desktop with Moby is the Windows development
+setup, not a project requirement. Start the engine first. Linux/macOS:
+
+```sh
+sh run-all.sh
+```
+
+Windows PowerShell:
 
 ```powershell
 # Explicit full build/start/test workflow:
@@ -20,10 +31,28 @@ image. Testcontainers creates separate MySQL/RabbitMQ containers for tests using
 the Docker socket and host.docker.internal. Initial image pulls can take minutes.
 Keep Docker and test containers running until completion.
 
-Application: <http://localhost:8080>. RabbitMQ UI: <http://localhost:15672>.
+Two application instances: <http://localhost:8080> and <http://localhost:8081>,
+sharing MySQL/RabbitMQ. Send a request to one and retry on the other to demonstrate
+cross-instance idempotency. Both have image healthchecks and run as non-root UID 10001.
+RabbitMQ UI: <http://localhost:15672>.
 MySQL: localhost:3306, database ledger. Local credentials for both: ledger/ledger.
 
 ### IntelliJ and development
+
+The original Windows .cmd build scripts have equivalent Linux/macOS .sh scripts:
+
+| Script | Behavior |
+| --- | --- |
+| `sh Build17.sh` | Clean, compile, execute tests and install |
+| `sh Build21SkipExecuteTests.sh` | Compile application/tests and install without executing tests |
+| `sh Build21SkipCompileAndExecuteTests.sh` | Build/install without compiling or executing tests |
+
+These local build scripts require Maven and use JAVA_HOME when provided, otherwise
+Java from PATH. On macOS, if JAVA_HOME is absent, JDK 17 is selected using
+`/usr/libexec/java_home`. The legacy `Build21` filenames are retained to match the
+original Windows scripts; they do not select Java 21. For example on Linux:
+`JAVA_HOME=/path/to/jdk-17 sh Build21SkipExecuteTests.sh`.
+The Docker-based `run-all.sh` workflow does not require host Maven.
 
 Import pom.xml; use C:\Java\jdk-17_x64 for Project SDK and Maven Runner JRE.
 Run com.ledger.LedgerApplication with the project root as working directory.
@@ -40,7 +69,7 @@ mvn clean verify
 ```
 
 If Docker occupies port 8080, stop its application before using the IDE:
-`docker compose -f compose.yaml -f compose-full.yaml stop app`.
+`docker compose -f compose.yaml -f compose-full.yaml stop app app-2`.
 `docker compose stop` stops infrastructure.
 `docker compose -f compose.yaml -f compose-full.yaml down` removes containers;
 adding --volumes deletes local data too. Named volumes preserve data by default.
@@ -298,7 +327,16 @@ ACK leads to safe redelivery.
 Invalid messages are saved in failed_payment_messages, then published with confirms
 to ledger.failed-payments / payment.failed / ledger.payment-settled.dlq. Original
 ACK occurs only afterwards. Quarantine may contain duplicates after failures.
-Infrastructure errors use backoff retries then requeue. The input queue declares
+Infrastructure errors receive four local backoff attempts, then confirmed publication
+to durable quorum retry queues with delays of 5, 30 and 120 seconds. Quorum at-least-once
+dead-lettering returns them to the input queue. After those rounds, messages are
+retained in ledger.payment-settled.parked for operator-controlled replay after recovery.
+LEDGER_PAYMENTS_DELAYED_RETRIES configures 0-3 delayed rounds (default 3).
+The original is ACKed only after the retry/parking publication is confirmed and routed.
+If the broker itself cannot confirm recovery publication, the original is requeued
+as a last-resort retention mechanism. Broker outage/reconnection behavior is distinct
+from a poison payload or database outage; no payment is intentionally discarded.
+The input queue declares
 x-delivery-limit=-1 to prevent quorum retry limits discarding payments. Invalid
 payloads do not block subsequent messages when infrastructure is available.
 Existing queues with different immutable arguments need controlled topology
@@ -313,9 +351,14 @@ durable queues; consumers sharing one queue divide deliveries.
 ```
 
 The outbox commits with financial records. Workers use FOR UPDATE SKIP LOCKED,
-one event per DB transaction, persistent messages, mandatory routing and publisher
-confirms before marking completion. No financial account locks are held while
-waiting for RabbitMQ. Poll interval defaults to 500 ms.
+short transactions to claim one event with a random lease token and a 30-second
+expiry using the database clock. Publication waits for confirms outside any DB
+transaction, without holding a Hikari connection. A second short transaction marks
+completion only if the lease token still matches. Failed workers/publications become
+eligible after expiry; another instance can resume. A worker stalled beyond its lease
+can publish a duplicate, consistent with at-least-once delivery. The confirmation
+timeout is 10 seconds; lease expiry also supplies retry backoff. Persistent messages,
+mandatory routing and publisher confirms remain enabled. Poll interval: 500 ms.
 
 - At-least-once delivery; deduplicate by stable eventId / AMQP message ID.
 - Crash after commit leaves the event pending for publication.
@@ -359,6 +402,33 @@ for detailed application logs; default is INFO. Credentials and complete request
 or payment payloads are not logged.
 
 ## Configuration
+
+The default local profile is intentionally retained for IDE development. Both Docker
+instances explicitly select prod, so they never start Compose from inside the image.
+External deployments must set SPRING_PROFILES_ACTIVE=prod explicitly.
+V5 persists transaction currency and adds outbox leases. Currency is no longer inferred
+from account state. Account restoration validates identity/currency/precision/overdraft;
+the full constructor is private. Transaction posting touches only referenced accounts.
+
+### Linux/macOS examples
+
+Scripts require POSIX sh and Docker only; no host Maven, jq, Python or curl is required.
+Use `sh start-containers.sh` for infrastructure only and
+`sh send-payment.sh MERCHANT_ACCOUNT_ID 125.50 EUR payment-42` to send a sample
+through the running app container's curl binary. Check the returned `routed` flag.
+The following optional host curl examples illustrate direct REST usage:
+
+```sh
+curl -X POST http://localhost:8080/api/v1/accounts \
+  -H 'Content-Type: application/json' -H 'Idempotency-Key: merchant-42' \
+  -d '{"currency":"EUR","overdraftLimit":0}'
+curl http://localhost:8081/api/v1/accounts/ACCOUNT_ID
+curl -X POST http://localhost:8080/api/v1/transactions \
+  -H 'Content-Type: application/json' -H 'Idempotency-Key: settlement-42' \
+  -d '{"description":"Settlement","entries":[{"accountId":"settlement-EUR","direction":"DEBIT","amount":"125.50"},{"accountId":"ACCOUNT_ID","direction":"CREDIT","amount":"125.50"}]}'
+curl -X POST http://localhost:8081/api/v1/transactions/TRANSACTION_ID/reversals \
+  -H 'Idempotency-Key: reverse-42'
+```
 
 - application.yml: shared configuration and default local profile.
 - application-local.yml: local MySQL/RabbitMQ and automatic Compose startup.
@@ -464,6 +534,7 @@ See AI_USAGE.md for AI-assisted work and verification notes.
 
 - Explicitly execute the current integration suite and verify all Flyway migrations.
 - Process-kill/network/broker-outage tests beyond simulated failure windows.
+- Production operations for parked-payment replay and lease/retry backlog monitoring.
 - OpenAPI response/schema validation in CI and reference/live contract drift checks.
 - Optional OpenTelemetry span export and operational trace storage.
 - Authentication, settlement access policies, restricted runtime DB privileges,
