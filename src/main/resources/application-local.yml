@@ -1,0 +1,18 @@
+spring:
+  docker:
+    compose:
+      enabled: true
+      file: compose.yaml
+      lifecycle-management: start-only
+      readiness:
+        timeout: 240s
+  datasource:
+    url: ${MYSQL_URL:jdbc:mysql://localhost:3306/ledger}
+    username: ${MYSQL_USERNAME:ledger}
+    password: ${MYSQL_PASSWORD:ledger}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:ledger}
+    password: ${RABBITMQ_PASSWORD:ledger}
+    virtual-host: ${RABBITMQ_VIRTUAL_HOST:/}

@@ -1,0 +1,350 @@
+openapi: 3.0.3
+info:
+  title: Double-entry Ledger API
+  version: 1.0.0
+  description: |
+    Exact single-currency double-entry transactions, immutable history and persistent idempotency.
+    Credits increase balances; debits decrease them. All timestamps are UTC ISO-8601 instants.
+    Monetary values are exact decimal numbers or strings on input and decimal numbers on output.
+    Clients must avoid binary floating-point when parsing money.
+    X-Correlation-ID and W3C traceparent headers are accepted and returned on all HTTP responses.
+servers:
+  - url: /
+paths:
+  /api/v1/accounts:
+    post:
+      operationId: openAccount
+      summary: Open a zero-balance account
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OpenAccount'
+      responses:
+        '201':
+          description: Account created, or original creation response replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/accounts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: getAccount
+      summary: Read an account and its current balance
+      responses:
+        '200':
+          description: Current account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/accounts/{id}/entries:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: getAccountEntries
+      summary: Read account entries, newest first
+      description: |
+        Ordered by recordedAt DESC, transactionId DESC, position DESC.
+        balanceAfter is the running balance after that entry in original entry order.
+        Overdraft validation applies to the net transaction effect, not intermediate entries.
+        Reuse the returned asOf on later pages to exclude newer postings. Each request uses
+        a consistent database snapshot; asOf does not freeze transactions still in flight.
+      parameters:
+        - name: page
+          in: query
+          schema: {type: integer, minimum: 0, default: 0}
+        - name: size
+          in: query
+          schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+        - name: asOf
+          in: query
+          schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Entry page
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/accounts/{id}/balance:
+    parameters:
+      - $ref: '#/components/parameters/AccountId'
+    get:
+      operationId: getHistoricalBalance
+      summary: Read the balance at an inclusive posting instant
+      description: |
+        Sums committed entries whose transaction recordedAt is less than or equal to at.
+        Returns zero before the first posting, including before account creation.
+        This is posting-time history, not a reconstruction of the database commit timeline.
+      parameters:
+        - name: at
+          in: query
+          required: true
+          schema: {type: string, format: date-time}
+      responses:
+        '200':
+          description: Historical balance
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricalBalance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/transactions:
+    post:
+      operationId: recordTransaction
+      summary: Record a balanced transaction atomically
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RecordTransaction'
+      responses:
+        '201':
+          description: Recorded transaction, or original response replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+  /api/v1/transactions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/TransactionId'
+    get:
+      operationId: getTransaction
+      summary: Read an immutable transaction
+      responses:
+        '200':
+          description: Recorded transaction
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '404':
+          $ref: '#/components/responses/NotFound'
+  /api/v1/transactions/{id}/reversals:
+    parameters:
+      - $ref: '#/components/parameters/TransactionId'
+    post:
+      operationId: reverseTransaction
+      summary: Reverse an original transaction once
+      description: No request body is accepted. Reversals respect current overdraft limits.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/Traceparent'
+      responses:
+        '201':
+          description: New reversal, or original response replayed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/BusinessError'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+components:
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: |
+        Operation-scoped persistent key. Same parsed request replays the original status/body;
+        a different request conflicts. Entry order and numeric scale are significant.
+        Parsing and structural validation failures do not reserve a key. Keys do not expire.
+      schema: {type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$'}
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      schema: {type: string, pattern: '^[A-Za-z0-9._:-]{1,128}$'}
+      description: Invalid or missing values are replaced with a generated identifier.
+    Traceparent:
+      name: traceparent
+      in: header
+      schema: {type: string}
+      description: W3C version 00 trace context; a child span is created for the request.
+    AccountId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string}
+    TransactionId:
+      name: id
+      in: path
+      required: true
+      schema: {type: string}
+  responses:
+    BadRequest:
+      description: Invalid JSON, headers, parameters or request structure
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Conflict:
+      description: Idempotency key reused for different content, or transaction already reversed
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    NotFound:
+      description: Account or transaction not found
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    BusinessError:
+      description: Invalid currency/precision, unbalanced entries, unknown posting account or overdraft exceeded
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+    Unavailable:
+      description: Transient database retries exhausted; retry using the same key
+      content:
+        application/json:
+          schema: {$ref: '#/components/schemas/Error'}
+  schemas:
+    MoneyInput:
+      description: Exact non-negative decimal, with at most two places (zero for JPY); max 9999999999999999999999.99
+      oneOf:
+        - {type: number}
+        - {type: string, pattern: '^[0-9]+(\.[0-9]+)?$'}
+    OpenAccount:
+      type: object
+      additionalProperties: false
+      required: [currency]
+      properties:
+        currency: {type: string, enum: [EUR, USD, JPY]}
+        overdraftLimit:
+          allOf: [{$ref: '#/components/schemas/MoneyInput'}]
+          nullable: true
+          description: Defaults to zero when absent or null
+    Account:
+      type: object
+      required: [id, currency, unlimitedOverdraft, balance]
+      properties:
+        id: {type: string}
+        currency: {type: string, enum: [EUR, USD, JPY]}
+        overdraftLimit: {type: number, nullable: true}
+        unlimitedOverdraft: {type: boolean}
+        balance: {type: number}
+    EntryInput:
+      type: object
+      additionalProperties: false
+      required: [accountId, direction, amount]
+      properties:
+        accountId: {type: string, minLength: 1, maxLength: 64}
+        direction: {type: string, enum: [DEBIT, CREDIT]}
+        amount:
+          allOf: [{$ref: '#/components/schemas/MoneyInput'}]
+          description: Must be strictly positive and fit the account currency precision
+    RecordTransaction:
+      type: object
+      additionalProperties: false
+      required: [description, entries]
+      properties:
+        description: {type: string, minLength: 1, maxLength: 500}
+        entries:
+          type: array
+          minItems: 2
+          maxItems: 1000
+          items: {$ref: '#/components/schemas/EntryInput'}
+    Entry:
+      type: object
+      required: [id, accountId, direction, amount, balanceAfter]
+      properties:
+        id: {type: string}
+        accountId: {type: string}
+        direction: {type: string, enum: [DEBIT, CREDIT]}
+        amount: {type: number}
+        balanceAfter: {type: number, description: Running account balance after this entry}
+    Transaction:
+      type: object
+      required: [id, description, recordedAt, currency, entries]
+      properties:
+        id: {type: string}
+        description: {type: string}
+        recordedAt: {type: string, format: date-time}
+        reversesTransactionId: {type: string, nullable: true}
+        currency: {type: string, enum: [EUR, USD, JPY]}
+        entries:
+          type: array
+          items: {$ref: '#/components/schemas/Entry'}
+    HistoryEntry:
+      type: object
+      required: [id, transactionId, recordedAt, position, direction, amount, balanceAfter]
+      properties:
+        id: {type: string}
+        transactionId: {type: string}
+        recordedAt: {type: string, format: date-time}
+        position: {type: integer, minimum: 0}
+        direction: {type: string, enum: [DEBIT, CREDIT]}
+        amount: {type: number}
+        balanceAfter: {type: number}
+    EntryPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages, asOf]
+      properties:
+        content:
+          type: array
+          items: {$ref: '#/components/schemas/HistoryEntry'}
+        page: {type: integer}
+        size: {type: integer}
+        totalElements: {type: integer, format: int64}
+        totalPages: {type: integer, format: int64}
+        asOf: {type: string, format: date-time}
+    HistoricalBalance:
+      type: object
+      required: [accountId, currency, at, balance]
+      properties:
+        accountId: {type: string}
+        currency: {type: string}
+        at: {type: string, format: date-time}
+        balance: {type: number}
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code: {type: string}
+        field: {type: string, nullable: true}
+        message: {type: string}
