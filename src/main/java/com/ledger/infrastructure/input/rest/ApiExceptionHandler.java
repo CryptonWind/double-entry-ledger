@@ -16,6 +16,16 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 @RestControllerAdvice
 @Log4j2
 public class ApiExceptionHandler {
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    ResponseEntity<ApiError> constraint(jakarta.validation.ConstraintViolationException e) {
+        var violation = e.getConstraintViolations().iterator().next();
+        return ResponseEntity.badRequest().body(new ApiError("VALIDATION_ERROR", violation.getPropertyPath().toString(), violation.getMessage()));
+    }
+
+    @ExceptionHandler(org.springframework.web.method.annotation.HandlerMethodValidationException.class)
+    ResponseEntity<ApiError> methodValidation(org.springframework.web.method.annotation.HandlerMethodValidationException e) {
+        return ResponseEntity.badRequest().body(new ApiError("VALIDATION_ERROR", "request", "Request parameters violate the API contract"));
+    }
     @ExceptionHandler(LedgerException.class)
     ResponseEntity<ApiError> domain(LedgerException e) {
         log.warn("Request refused code={} field={} status={} reason={}", e.getCode(), e.getField(), e.getStatus(), e.getMessage());

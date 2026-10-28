@@ -13,6 +13,17 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class DatabaseTransactions implements com.ledger.application.port.out.UnitOfWork {
     private final TransactionTemplate transactions;
 
+    @Override public <T> T required(Supplier<T> action) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive()) {
+            if (org.springframework.transaction.support.TransactionSynchronizationManager.isCurrentTransactionReadOnly()) {
+                throw new IllegalStateException("A write use case cannot join a read-only transaction");
+            }
+            // A domain refusal is deliberately caught by the outer idempotency use case.
+            return action.get();
+        }
+        return execute(action);
+    }
+
     @Override
     public <T> T read(Supplier<T> action) {
         var read = new TransactionTemplate(transactions.getTransactionManager());

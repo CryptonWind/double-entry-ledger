@@ -39,11 +39,15 @@ public class OutboxPublisher {
             try (var ignored = TraceContext.open(claim.correlationId(), TraceContext.child(claim.traceparent()))) {
                 // No database transaction or pooled connection is held while waiting for RabbitMQ.
                 publisher.publish(MessagingConfiguration.TRANSACTION_EXCHANGE, "transaction.recorded", claim.id(), claim.payload());
-                transactions.execute(status -> entities.createNativeQuery(
+                Integer updated = transactions.execute(status -> entities.createNativeQuery(
                         "UPDATE outbox_events SET published_at=UTC_TIMESTAMP(6), lease_token=NULL, lease_until=NULL "
                                 + "WHERE id=:id AND lease_token=:token AND published_at IS NULL")
                         .setParameter("id", claim.id()).setParameter("token", claim.token()).executeUpdate());
-                log.info("Published transaction event eventId={}", claim.id());
+                if (updated != null && updated == 1) {
+                    log.info("Published transaction event eventId={}", claim.id());
+                } else {
+                    log.warn("Outbox lease lost after broker confirmation eventId={}; duplicate delivery possible", claim.id());
+                }
             } catch (RuntimeException e) {
                 // Leave the lease intact: failed publications back off and crashed workers recover identically.
                 log.warn("Outbox publication failed eventId={}; eligible again after lease expiry", claim.id(), e);

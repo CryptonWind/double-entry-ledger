@@ -45,7 +45,7 @@ public abstract class UnitTestBase {
                 LedgerEntryRepository entries, EntityManager entities, JsonSupport json) {
             var accountAdapter = new JpaAccountAdapter(accounts, entities);
             return new DefaultLedgerService(accountAdapter,
-                    new JpaTransactionAdapter(transactions, entries, accountAdapter, entities),
+                    new JpaTransactionAdapter(transactions, entries, entities),
                     new OutboxAnnouncementAdapter(entities, json), directWork());
         }
         @Bean DatabaseTransactions databaseTransactions(TransactionTemplate template) { return new DatabaseTransactions(template); }

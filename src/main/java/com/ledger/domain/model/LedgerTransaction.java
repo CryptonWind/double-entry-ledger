@@ -79,9 +79,10 @@ public record LedgerTransaction(String id, String description, Instant recordedA
 
     private static void validateResultingBalances(List<Posting> postings, Map<String, Account> accounts,
             Map<String, BigDecimal> deltas) {
+        Map<String, Integer> firstPositions = new HashMap<>();
+        for (int i = 0; i < postings.size(); i++) firstPositions.putIfAbsent(postings.get(i).accountId(), i);
         for (var account : accounts.values()) {
-            int index = java.util.stream.IntStream.range(0, postings.size())
-                    .filter(i -> postings.get(i).accountId().equals(account.getId())).findFirst().orElseThrow();
+            int index = firstPositions.get(account.getId());
             account.validatePosting(deltas.get(account.getId()), "entries[" + index + "].accountId");
         }
     }

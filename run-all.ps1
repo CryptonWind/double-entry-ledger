@@ -4,7 +4,7 @@ param()
 $ErrorActionPreference = 'Stop'
 $compose = @('compose', '--file', "$PSScriptRoot\compose.yaml", '--file', "$PSScriptRoot\compose-full.yaml")
 
-& docker @compose build app app-2 tests
+& docker @compose build app tests
 if ($LASTEXITCODE -ne 0) { throw 'Docker build failed.' }
 
 & docker @compose up --detach --wait --wait-timeout 240 app app-2

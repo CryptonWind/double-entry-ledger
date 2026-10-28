@@ -16,6 +16,15 @@ import static org.awaitility.Awaitility.await;
 
 class FailureRecoveryIntegrationTest extends IntegrationTestBase {
     @Test
+    void standaloneUseCasesEstablishTheirOwnTransactions() {
+        var account = accounts.open(new com.ledger.application.model.LedgerModels.OpenAccount("EUR", null));
+        var posted = ledger.record(transfer("settlement-EUR", account.id(), "125.50"));
+        assertThat(accounts.get(account.id()).balance()).isEqualByComparingTo("125.50");
+        ledger.reverse(posted.id());
+        assertThat(accounts.get(account.id()).balance()).isEqualByComparingTo("0.00");
+        assertIntegrity();
+    }
+    @Test
     void brokerConfirmationDoesNotHoldDatabaseTransaction() {
         String merchant = account("EUR");
         record(transfer("settlement-EUR", merchant, "1.00"));

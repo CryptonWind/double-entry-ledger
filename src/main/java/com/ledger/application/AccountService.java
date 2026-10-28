@@ -20,6 +20,10 @@ public class AccountService implements AccountUseCases {
     private final UnitOfWork work;
 
     public AccountView open(OpenAccount request) {
+        return work.required(() -> openAccount(request));
+    }
+
+    private AccountView openAccount(OpenAccount request) {
         var account = Account.open(UUID.randomUUID().toString(), request.currency(), request.overdraftLimit(), java.time.Instant.now());
         accounts.insert(account);
         log.info("Opened account accountId={} currency={} overdraftLimit={}", account.getId(), account.getCurrency(), account.getOverdraftLimit());

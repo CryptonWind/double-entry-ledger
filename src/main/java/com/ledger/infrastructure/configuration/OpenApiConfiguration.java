@@ -19,10 +19,12 @@ public class OpenApiConfiguration {
 
     @Bean OpenApiCustomizer correlationHeaders() {
         return api -> api.getPaths().values().forEach(path -> path.readOperations().forEach(operation -> {
-            operation.addParametersItem(new HeaderParameter().name("X-Correlation-ID")
+            if (operation.getParameters() == null || operation.getParameters().stream().noneMatch(p -> "X-Correlation-ID".equals(p.getName())))
+                operation.addParametersItem(new HeaderParameter().name("X-Correlation-ID")
                     .description("Optional correlation ID; invalid/missing values are replaced and returned in the response")
                     .schema(new StringSchema().pattern("^[A-Za-z0-9._:-]{1,128}$")));
-            operation.addParametersItem(new HeaderParameter().name("traceparent")
+            if (operation.getParameters() == null || operation.getParameters().stream().noneMatch(p -> "traceparent".equals(p.getName())))
+                operation.addParametersItem(new HeaderParameter().name("traceparent")
                     .description("Optional W3C version-00 trace context; propagated through messages and announcements")
                     .schema(new StringSchema()));
         }));

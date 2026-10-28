@@ -122,6 +122,50 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>org.openapitools</groupId>
+                <artifactId>openapi-generator-maven-plugin</artifactId>
+                <version>7.26.0</version>
+                <executions>
+                    <execution>
+                        <id>generate-rest-contract</id>
+                        <phase>generate-sources</phase>
+                        <goals><goal>generate</goal></goals>
+                        <configuration>
+                            <inputSpec>${project.basedir}/src/main/resources/openapi.yaml</inputSpec>
+                            <generatorName>spring</generatorName>
+                            <apiPackage>com.ledger.infrastructure.input.rest.generated.api</apiPackage>
+                            <modelPackage>com.ledger.infrastructure.input.rest.generated.model</modelPackage>
+                            <modelNameSuffix>Dto</modelNameSuffix>
+                            <generateApiTests>false</generateApiTests>
+                            <generateModelTests>false</generateModelTests>
+                            <generateApiDocumentation>false</generateApiDocumentation>
+                            <generateModelDocumentation>false</generateModelDocumentation>
+                            <configOptions>
+                                <interfaceOnly>true</interfaceOnly>
+                                <skipDefaultInterface>true</skipDefaultInterface>
+                                <useSpringBoot4>true</useSpringBoot4>
+                                <useTags>true</useTags>
+                                <useResponseEntity>true</useResponseEntity>
+                                <generateGenericResponseEntity>true</generateGenericResponseEntity>
+                                <openApiNullable>false</openApiNullable>
+                                <dateLibrary>java8</dateLibrary>
+                                <annotationLibrary>swagger2</annotationLibrary>
+                                <documentationProvider>springdoc</documentationProvider>
+                                <useBeanValidation>true</useBeanValidation>
+                                <performBeanValidation>false</performBeanValidation>
+                                <useOneOfInterfaces>false</useOneOfInterfaces>
+                                <serializationLibrary>jackson3</serializationLibrary>
+                                <generateJsonIncludeAnnotations>false</generateJsonIncludeAnnotations>
+                                <generateJsonSetterNullsAnnotations>false</generateJsonSetterNullsAnnotations>
+                            </configOptions>
+                            <typeMappings><typeMapping>MoneyInput=BigDecimal</typeMapping><typeMapping>DateTime=Instant</typeMapping></typeMappings>
+                            <importMappings><importMapping>BigDecimal=java.math.BigDecimal</importMapping><importMapping>Instant=java.time.Instant</importMapping></importMappings>
+                            <schemaMappings><schemaMapping>MoneyInput=java.math.BigDecimal</schemaMapping></schemaMappings>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>

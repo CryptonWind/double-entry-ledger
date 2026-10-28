@@ -3,7 +3,7 @@ set -eu
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 compose() { docker compose -f "$ROOT/compose.yaml" -f "$ROOT/compose-full.yaml" "$@"; }
 docker info >/dev/null
-compose build app app-2 tests
+compose build app tests
 # Image healthchecks validate HTTP health without requiring curl on the host.
 compose up -d --wait --wait-timeout 300 app app-2
 compose run --rm tests

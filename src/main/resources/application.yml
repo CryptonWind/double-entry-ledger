@@ -55,5 +55,6 @@ springdoc:
   packages-to-scan: com.ledger.infrastructure.input.rest
   swagger-ui:
     path: /swagger-ui.html
+    url: /openapi.yaml
     operations-sorter: alpha
     tags-sorter: alpha

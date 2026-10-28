@@ -74,6 +74,7 @@ If Docker occupies port 8080, stop its application before using the IDE:
 `docker compose -f compose.yaml -f compose-full.yaml down` removes containers;
 adding --volumes deletes local data too. Named volumes preserve data by default.
 Infrastructure uses restart: unless-stopped.
+Both app services use the same ledger-app:local image; build scripts build it once.
 
 ## Architecture
 
@@ -215,25 +216,33 @@ case-sensitive collation. Unique constraints protect payment IDs and reversals.
 - Swagger UI: <http://localhost:8080/swagger-ui.html> (also /swagger-ui/index.html).
 - Live controller-derived OpenAPI JSON: <http://localhost:8080/v3/api-docs>.
 - Live OpenAPI YAML: <http://localhost:8080/v3/api-docs.yaml>.
-- Maintained reference contract: <http://localhost:8080/openapi.yaml>, sourced from
+- Source-of-truth contract: <http://localhost:8080/openapi.yaml>, sourced from
   src/main/resources/openapi.yaml.
 
-Springdoc 3.x is used for Spring Boot 4 (the Baeldung article's 2.x examples target
-Boot 3). Controllers carry @Tag, @Operation, @ApiResponse, request examples and
-parameter documentation. DocumentedErrors provides shared typed error responses.
-OpenApiConfiguration adds API metadata and correlation headers. REST Bean Validation
-constraints are included in generated request schemas. Successful String-backed
-idempotent responses explicitly document their actual Account/Transaction schemas.
+OpenAPI Generator runs in Maven's generate-sources phase before compilation.
+It validates openapi.yaml and creates AccountsApi, TransactionsApi and request/response
+DTOs under target/generated-sources/openapi. Generated interfaces carry HTTP mappings,
+OpenAPI annotations and Bean Validation derived from the specification. Handwritten
+controllers implement those interfaces and map DTOs to plain application commands;
+generated types never enter the domain/application layers. MoneyInput is explicitly
+mapped to BigDecimal and date-time to Instant. No domain models, entities or business
+logic are generated. ResponseEntity<?> permits exact serialized idempotency replay
+and typed error responses while the contract documents concrete response schemas.
 
-Swagger UI uses the live generated contract, not a fixed YAML URL. Expand an
+Swagger UI displays /openapi.yaml, the exact input used for code generation. Expand an
 operation, select Try it out, supply Idempotency-Key for POSTs, replace sample
 account IDs with real ones, then Execute. A new business attempt needs a new key;
 reusing the same request/key intentionally replays the original result.
 Pagination/history query parameters and reversal restrictions are documented too.
-The reference contract and controller annotations should be kept synchronized.
-Documentation was introduced after initial implementation, so the original work
-was not historically API-first. No build plugin starts the app or runs tests to
-generate documentation; Springdoc generates it when requested from a running app.
+For API changes, edit the YAML first, run `mvn generate-sources`, then implement
+the generated signatures and update tests. `mvn compile`, `mvn test-compile` and
+the existing build scripts automatically perform generation. Do not edit or commit
+target/generated-sources; IntelliJ can import it after Maven reload/generation.
+A changed interface makes incompatible implementations fail compilation.
+Springdoc also exposes /v3/api-docs[.yaml] from the generated interface annotations.
+Generation does not start the application, containers or tests.
+The original prototype was code-first; API evolution is contract-first from this
+migration onward. This does not retroactively change the original development order.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
@@ -403,6 +412,51 @@ or payment payloads are not logged.
 
 ## Configuration
 
+### Operational recovery and metrics
+
+After restoring database/broker availability, explicitly replay a bounded batch:
+
+```sh
+sh replay-parked.sh 100
+```
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\replay-parked.ps1 -Limit 100
+```
+
+The one-shot container snapshots the parked ready count, consumes without auto-ACK,
+resets retry metadata, republishes a persistent payment to the durable input queue,
+waits for broker confirmation and then ACKs the parked original. Failed replay retains
+the original. A crash between confirmation and ACK may duplicate delivery; payment-ID
+deduplication protects financial effects. Replay does not run automatically.
+
+Micrometer counters: ledger.payments.recovery (destination tag),
+ledger.payments.recovery.publication.failures; gauge: ledger.payments.parked.ready.
+Every minute each instance logs a warning if parked messages await replay. These
+metrics are per instance; the queue gauge measures ready messages, not unacknowledged
+deliveries. Export using your preferred monitoring registry; management endpoint
+exposure remains restricted to the existing health/info configuration.
+
+Write use cases establish their own boundary through UnitOfWork.required. When
+called from idempotency they join its existing write transaction without introducing
+a rollback-only marker for a caught business refusal. Standalone jobs/listeners can
+invoke them safely as well. Outbox completion logs success only when the token-checked
+update affects one row; a lost lease produces a warning about possible duplicates.
+
+### Migration failure recovery
+
+Run schema/data migrations with application traffic stopped and one designated
+migration runner. MySQL DDL is not transactional. V4/V5 temporarily remove update
+guards for explicit backfills. The afterMigrateError callback reinstates all history
+guards on a reported migration failure without changing applied migration checksums.
+If the process is killed or the DB connection is lost, callbacks cannot guarantee
+execution: keep writers stopped, run the callback SQL manually after reconnecting,
+inspect SHOW TRIGGERS and partial schema/data changes, then repair Flyway history only
+after diagnosis and complete the migration. A failed initial schema creation may
+require restoring the tables before running the guard script. Do not restart traffic
+until migration success and all four triggers are confirmed. The callback mitigates
+normal migration failures; it does not claim atomic DDL or recovery from server loss.
+
 The default local profile is intentionally retained for IDE development. Both Docker
 instances explicitly select prod, so they never start Compose from inside the image.
 External deployments must set SPRING_PROFILES_ACTIVE=prod explicitly.
@@ -535,7 +589,7 @@ See AI_USAGE.md for AI-assisted work and verification notes.
 - Explicitly execute the current integration suite and verify all Flyway migrations.
 - Process-kill/network/broker-outage tests beyond simulated failure windows.
 - Production operations for parked-payment replay and lease/retry backlog monitoring.
-- OpenAPI response/schema validation in CI and reference/live contract drift checks.
+- OpenAPI response/schema validation in CI and source-contract/live contract drift checks.
 - Optional OpenTelemetry span export and operational trace storage.
 - Authentication, settlement access policies, restricted runtime DB privileges,
   production TLS/secrets, backups and clustered MySQL/RabbitMQ.

@@ -11,6 +11,16 @@ import static org.mockito.Mockito.*;
 
 class DatabaseTransactionsTest extends UnitTestBase {
     @Test
+    void requiredJoinsExistingWriteBoundaryWithoutOpeningAnotherTransaction() {
+        org.springframework.transaction.support.TransactionSynchronizationManager.setActualTransactionActive(true);
+        try {
+            assertThat(transactions.required(() -> "joined")).isEqualTo("joined");
+            verifyNoInteractions(template);
+        } finally {
+            org.springframework.transaction.support.TransactionSynchronizationManager.clear();
+        }
+    }
+    @Test
     void retriesTransientLockFailuresAndReturnsSuccessfulResult() {
         var attempts = new AtomicInteger();
         assertThat(transactions.execute(() -> {

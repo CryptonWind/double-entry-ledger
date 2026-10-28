@@ -1,6 +1,5 @@
 package com.ledger.infrastructure.output.persistence;
 
-import com.ledger.application.port.out.AccountStore;
 import com.ledger.domain.service.MoneyRules;
 import com.ledger.application.port.out.TransactionStore;
 import com.ledger.domain.model.Direction;
@@ -16,7 +15,6 @@ import org.springframework.stereotype.Repository;
 public class JpaTransactionAdapter implements TransactionStore {
     private final LedgerTransactionRepository repository;
     private final LedgerEntryRepository entries;
-    private final AccountStore accounts;
     private final EntityManager entities;
 
     @Override public Optional<LedgerTransaction> find(String id) { return repository.findById(id).map(this::toDomain); }

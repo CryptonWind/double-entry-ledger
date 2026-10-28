@@ -1,78 +1,38 @@
 package com.ledger.infrastructure.input.rest;
 
-import com.ledger.application.port.in.AccountUseCases;
-import com.ledger.application.AccountHistoryService;
-import com.ledger.application.port.in.AccountHistoryUseCases;
+import com.ledger.application.model.LedgerModels;
+import com.ledger.application.port.in.*;
+import com.ledger.infrastructure.input.rest.generated.api.AccountsApi;
+import com.ledger.infrastructure.input.rest.generated.model.*;
+import com.ledger.application.port.out.JsonCodec;
 import java.time.Instant;
-import org.springframework.format.annotation.DateTimeFormat;
-import com.ledger.application.port.in.IdempotentOperations;
-import com.ledger.application.model.LedgerModels.AccountView;
-import com.ledger.application.model.LedgerModels.OpenAccount;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
-import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.tags.Tag;
-import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.Schema;
+import org.springframework.web.bind.annotation.RestController;
 
+/** Implements the generated input contract; business models remain independent of generated DTOs. */
 @RestController
-@RequestMapping("/api/v1/accounts")
 @RequiredArgsConstructor
-@Tag(name = "Accounts", description = "Account creation, current balances and immutable posting history")
-@DocumentedErrors
-public class AccountController {
-    public record OpenAccountRequest(@jakarta.validation.constraints.NotBlank(message = "Currency is required")
-                                     String currency, java.math.BigDecimal overdraftLimit) { }
+public class AccountController implements AccountsApi {
     private final AccountUseCases accounts;
     private final IdempotentOperations idempotency;
     private final AccountHistoryUseCases history;
+    private final JsonCodec json;
 
-    @PostMapping
-    @Operation(operationId = "openAccount", summary = "Open a zero-balance account",
-            description = "Supports EUR, USD and JPY. Overdraft defaults to zero. Same key/request replays the original response.")
-    @ApiResponse(responseCode = "201", description = "Account created or original result replayed",
-            content = @Content(mediaType = "application/json", schema = @Schema(implementation = AccountView.class)))
-    public ResponseEntity<String> open(@Parameter(description = "Required operation-scoped retry key, 1-128 ASCII letters/digits or . _ : -", required = true)
-                                       @RequestHeader("Idempotency-Key") String key,
-                                       @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Account currency and optional non-negative overdraft limit", required = true,
-                                               content = @Content(examples = @io.swagger.v3.oas.annotations.media.ExampleObject(value = "{\"currency\":\"EUR\",\"overdraftLimit\":0}")))
-                                       @Valid @RequestBody OpenAccountRequest request) {
-        var command = new OpenAccount(request.currency(), request.overdraftLimit());
-        var response = idempotency.execute("open-account", key, command, () -> accounts.open(command));
-        return ResponseEntity.status(response.status()).contentType(MediaType.APPLICATION_JSON).body(response.body());
+    @Override public ResponseEntity<?> openAccount(String key, OpenAccountDto request, String correlationId, String traceparent) {
+        var command = new LedgerModels.OpenAccount(request.getCurrency(), request.getOverdraftLimit());
+        var result = idempotency.execute("open-account", key, command, () -> convert(accounts.open(command), AccountDto.class));
+        return ResponseEntity.status(result.status()).contentType(MediaType.APPLICATION_JSON).body(result.body());
     }
-
-    @GetMapping("/{id}")
-    @Operation(operationId = "getAccount", summary = "Read an account and its current balance")
-    @ApiResponse(responseCode = "200", description = "Current account", content = @Content(schema = @Schema(implementation = AccountView.class)))
-    public AccountView get(@PathVariable String id) {
-        return accounts.get(id);
+    @Override public ResponseEntity<?> getAccount(String id) {
+        return ResponseEntity.ok(convert(accounts.get(id), AccountDto.class));
     }
-
-    @GetMapping("/{id}/entries")
-    @Operation(operationId = "getAccountEntries", summary = "Read newest-first paginated entries",
-            description = "Ordered by recordedAt, transaction ID and entry position descending. Page starts at 0; size is 1-200. "
-                    + "Reuse returned asOf for subsequent pages. balanceAfter is the running balance after each entry; "
-                    + "overdraft applies to the atomic net effect. Timestamp pagination is not a durable snapshot token.")
-    @ApiResponse(responseCode = "200", description = "Entry page", content = @Content(schema = @Schema(implementation = AccountHistoryService.EntryPage.class)))
-    public AccountHistoryService.EntryPage entries(@PathVariable String id,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "50") int size,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant asOf) {
-        return history.entries(id, page, size, asOf);
+    @Override public ResponseEntity<?> getAccountEntries(String id, Integer page, Integer size, Instant asOf) {
+        return ResponseEntity.ok(convert(history.entries(id, page == null ? 0 : page, size == null ? 50 : size, asOf), EntryPageDto.class));
     }
-
-    @GetMapping("/{id}/balance")
-    @Operation(operationId = "getHistoricalBalance", summary = "Read balance at an inclusive posting instant",
-            description = "Sums committed entries whose recordedAt <= at. Returns zero before the first posting. "
-                    + "Uses posting time, not the database commit visibility timeline. Supply an ISO-8601 UTC instant.")
-    @ApiResponse(responseCode = "200", description = "Historical balance", content = @Content(schema = @Schema(implementation = AccountHistoryService.HistoricalBalance.class)))
-    public AccountHistoryService.HistoricalBalance balance(@PathVariable String id,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant at) {
-        return history.balance(id, at);
+    @Override public ResponseEntity<?> getHistoricalBalance(String id, Instant at) {
+        return ResponseEntity.ok(convert(history.balance(id, at), HistoricalBalanceDto.class));
     }
+    private <T> T convert(Object result, Class<T> type) { return json.read(json.write(result), type); }
 }

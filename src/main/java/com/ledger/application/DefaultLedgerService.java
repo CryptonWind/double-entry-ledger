@@ -27,12 +27,20 @@ public class DefaultLedgerService implements LedgerService {
     private final UnitOfWork work;
 
     @Override public TransactionView record(RecordTransaction request) {
+        return work.required(() -> recordRequest(request));
+    }
+
+    private TransactionView recordRequest(RecordTransaction request) {
         List<LedgerTransaction.Posting> postings = request.entries() == null ? null : request.entries().stream()
                 .map(e -> e == null ? null : new LedgerTransaction.Posting(e.accountId(), e.direction(), e.amount())).toList();
         return record(request.description(), postings, null);
     }
 
     @Override public TransactionView reverse(String originalId) {
+        return work.required(() -> reverseOriginal(originalId));
+    }
+
+    private TransactionView reverseOriginal(String originalId) {
         var original = transactions.lock(originalId).orElseThrow(() ->
                 new LedgerException(404, "TRANSACTION_NOT_FOUND", "transactionId", "Unknown transaction: " + originalId));
         var postings = original.reversalPostings();

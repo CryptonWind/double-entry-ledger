@@ -18,6 +18,10 @@ public class PaymentRetryRecoverer implements MessageRecoverer {
     private final RabbitTemplate rabbit;
     @org.springframework.beans.factory.annotation.Value("${ledger.payments.delayed-retries:3}")
     private int delayedRetries = 3;
+    private io.micrometer.core.instrument.MeterRegistry metrics;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public void metrics(io.micrometer.core.instrument.MeterRegistry registry) { metrics = registry; }
     @Override public void recover(Message message, Throwable cause) {
         // Do not mutate the original delivery if publication fails and it has to be requeued.
         Message recoveryMessage = org.springframework.amqp.core.MessageBuilder.fromClonedMessage(message).build();
@@ -35,7 +39,9 @@ public class PaymentRetryRecoverer implements MessageRecoverer {
             }
             log.warn("Payment infrastructure failure routed={} attempt={} messageId={}", routing, attempts + 1,
                     message.getMessageProperties().getMessageId());
+            if (metrics != null) metrics.counter("ledger.payments.recovery", "destination", routing).increment();
         } catch (Exception e) {
+            if (metrics != null) metrics.counter("ledger.payments.recovery.publication.failures").increment();
             if (e instanceof InterruptedException) Thread.currentThread().interrupt();
             throw new ImmediateRequeueAmqpException("Broker recovery publication unavailable; retain original payment", e);
         }

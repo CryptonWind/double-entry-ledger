@@ -9,6 +9,7 @@ OpenCode assisted with:
 - Designing reliable messaging with a transactional outbox, leases and delayed retries.
 - Creating unit, architecture and integration tests based on the challenge examples.
 - Preparing Docker configuration, cross-platform scripts, logging and OpenAPI documentation.
+- Migrating REST adapters to contract-first OpenAPI generation of interfaces and DTOs.
 - Reviewing and refactoring code, investigating reported failures and updating the README.
 
 AI-generated changes were reviewed against the requirements and checked through

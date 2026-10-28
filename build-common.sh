@@ -10,5 +10,5 @@ if [ -n "${JAVA_HOME:-}" ]; then
 fi
 if ! command -v java >/dev/null 2>&1 || ! command -v mvn >/dev/null 2>&1; then
     printf '%s\n' 'Java and Maven are required. Set JAVA_HOME to your JDK 17 installation and install Maven.' >&2
-    exit 1
+    return 1
 fi
