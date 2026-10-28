@@ -2,7 +2,7 @@ package com.ledger.unit;
 
 import com.ledger.application.port.out.AccountStore;
 import com.ledger.domain.model.Account;
-import com.ledger.application.LedgerService;
+import com.ledger.application.DefaultLedgerService;
 import com.ledger.application.model.LedgerModels.*;
 import com.ledger.application.port.out.TransactionAnnouncements;
 import com.ledger.application.port.out.TransactionStore;
@@ -24,7 +24,7 @@ class LedgerUseCasePortsTest {
         AccountStore accounts = mock(AccountStore.class);
         TransactionStore transactions = mock(TransactionStore.class);
         TransactionAnnouncements announcements = mock(TransactionAnnouncements.class);
-        var useCase = new LedgerService(accounts, transactions, announcements, new com.ledger.application.port.out.UnitOfWork() {
+        var useCase = new DefaultLedgerService(accounts, transactions, announcements, new com.ledger.application.port.out.UnitOfWork() {
             @Override public <T> T execute(java.util.function.Supplier<T> action) { return action.get(); }
         });
         var settlement = new Account("settlement-EUR", "EUR", null, BigDecimal.ZERO, Instant.EPOCH, null);

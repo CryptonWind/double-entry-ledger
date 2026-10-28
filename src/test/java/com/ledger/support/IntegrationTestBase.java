@@ -89,7 +89,7 @@ public abstract class IntegrationTestBase {
 
     @Autowired protected IdempotencyService idempotency;
     @Autowired protected AccountService accounts;
-    @Autowired protected LedgerService ledger;
+    @Autowired protected com.ledger.application.port.in.LedgerService ledger;
     @Autowired protected JsonSupport json;
     @Autowired protected HibernateDatabase database;
     @Autowired protected EntityManager entities;

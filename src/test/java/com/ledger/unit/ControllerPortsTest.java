@@ -41,7 +41,7 @@ class ControllerPortsTest {
 
     @Test
     void transactionControllerUsesPortsForRecordingReadingAndReversing() {
-        var ledger = mock(TransactionUseCases.class);
+        var ledger = mock(LedgerService.class);
         var idempotency = mock(IdempotentOperations.class);
         var controller = new TransactionController(ledger, idempotency);
         when(idempotency.execute(anyString(), anyString(), any(), any())).thenAnswer(invocation -> {

@@ -117,8 +117,8 @@ Application services orchestrate business objects through input/output ports:
 | --- | --- | --- |
 | AccountUseCases | AccountService | AccountStore |
 | AccountHistoryUseCases | AccountHistoryService | AccountHistoryReader, AccountUseCases |
-| TransactionUseCases | LedgerService | AccountStore, TransactionStore, TransactionAnnouncements |
-| SettlePayment | PaymentService | PaymentStore, AccountStore, TransactionUseCases, UnitOfWork, JsonCodec |
+| LedgerService | DefaultLedgerService | AccountStore, TransactionStore, TransactionAnnouncements |
+| SettlePayment | PaymentService | PaymentStore, AccountStore, LedgerService, UnitOfWork, JsonCodec |
 | IdempotentOperations | IdempotencyService | IdempotencyStore, UnitOfWork, JsonCodec |
 
 Controllers depend on input ports and map validated transport requests to plain

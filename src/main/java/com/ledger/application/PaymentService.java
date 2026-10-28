@@ -6,7 +6,7 @@ import com.ledger.application.port.out.JsonCodec;
 import com.ledger.domain.exception.LedgerException;
 import com.ledger.application.model.LedgerModels.EntryInput;
 import com.ledger.application.model.LedgerModels.RecordTransaction;
-import com.ledger.application.port.in.TransactionUseCases;
+import com.ledger.application.port.in.LedgerService;
 import com.ledger.domain.model.Direction;
 import java.math.BigDecimal;
 import java.util.List;
@@ -22,7 +22,7 @@ public class PaymentService implements com.ledger.application.port.in.SettlePaym
     private final PaymentStore store;
     private final AccountStore accounts;
     private final JsonCodec json;
-    private final TransactionUseCases ledger;
+    private final LedgerService ledger;
 
     public record PaymentSettled(String eventId, String paymentId, String merchantAccountId,
                                  BigDecimal amount, String currency) { }

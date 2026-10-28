@@ -41,10 +41,10 @@ public abstract class UnitTestBase {
         @Bean AccountHistoryService historyService(AccountService accounts, EntityManager entities) {
             return new AccountHistoryService(accounts, new JpaAccountHistoryAdapter(entities), directWork());
         }
-        @Bean LedgerService ledgerService(AccountRepository accounts, LedgerTransactionRepository transactions,
+        @Bean DefaultLedgerService ledgerService(AccountRepository accounts, LedgerTransactionRepository transactions,
                 LedgerEntryRepository entries, EntityManager entities, JsonSupport json) {
             var accountAdapter = new JpaAccountAdapter(accounts, entities);
-            return new LedgerService(accountAdapter,
+            return new DefaultLedgerService(accountAdapter,
                     new JpaTransactionAdapter(transactions, entries, accountAdapter, entities),
                     new OutboxAnnouncementAdapter(entities, json), directWork());
         }
@@ -55,7 +55,7 @@ public abstract class UnitTestBase {
                     json, transactions);
         }
         @Bean PaymentService paymentService(DatabaseTransactions transactions, HibernateDatabase database,
-                EntityManager entities, JsonSupport json, LedgerService ledger, AccountRepository accounts) {
+                EntityManager entities, JsonSupport json, DefaultLedgerService ledger, AccountRepository accounts) {
             return new PaymentService(transactions,
                     new JpaPaymentAdapter(database, entities),
                     new JpaAccountAdapter(accounts, entities), json, ledger);
@@ -86,7 +86,7 @@ public abstract class UnitTestBase {
     @Autowired protected JsonSupport json;
     @Autowired protected AccountService accounts;
     @Autowired protected AccountHistoryService history;
-    @Autowired protected LedgerService ledger;
+    @Autowired protected DefaultLedgerService ledger;
     @Autowired protected DatabaseTransactions transactions;
     @Autowired protected IdempotencyService idempotency;
     @Autowired protected PaymentService payments;

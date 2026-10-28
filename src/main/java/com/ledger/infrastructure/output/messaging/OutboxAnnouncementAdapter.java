@@ -2,7 +2,7 @@ package com.ledger.infrastructure.output.messaging;
 
 import com.ledger.infrastructure.output.serialization.JsonSupport;
 import com.ledger.infrastructure.tracing.TraceContext;
-import com.ledger.application.LedgerService;
+import com.ledger.application.DefaultLedgerService;
 import com.ledger.application.port.out.TransactionAnnouncements;
 import com.ledger.domain.model.LedgerTransaction;
 import com.ledger.infrastructure.output.persistence.OutboxEvent;
@@ -33,7 +33,7 @@ public class OutboxAnnouncementAdapter implements TransactionAnnouncements {
         event.put("traceparent", traceparent);
         event.put("paymentId", MDC.get("paymentId"));
         event.put("sourceEventId", MDC.get("sourceEventId"));
-        event.put("transaction", LedgerService.view(transaction));
+        event.put("transaction", DefaultLedgerService.view(transaction));
         entities.persist(new OutboxEvent(eventId, json.write(event), transaction.recordedAt(), null, correlationId, traceparent));
         log.info("Enqueued announcement transactionId={} eventId={} paymentId={} sourceEventId={}",
                 transaction.id(), eventId, MDC.get("paymentId"), MDC.get("sourceEventId"));

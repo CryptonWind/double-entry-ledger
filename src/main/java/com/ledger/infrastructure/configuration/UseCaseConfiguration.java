@@ -11,8 +11,8 @@ import com.ledger.application.PaymentService;
 import com.ledger.application.port.out.PaymentStore;
 import com.ledger.application.port.out.JsonCodec;
 import com.ledger.application.port.out.UnitOfWork;
-import com.ledger.application.LedgerService;
-import com.ledger.application.port.in.TransactionUseCases;
+import com.ledger.application.DefaultLedgerService;
+import com.ledger.application.port.in.LedgerService;
 import com.ledger.application.port.out.TransactionAnnouncements;
 import com.ledger.application.port.out.TransactionStore;
 import org.springframework.context.annotation.Bean;
@@ -27,12 +27,12 @@ public class UseCaseConfiguration {
     @Bean AccountHistoryService accountHistoryService(AccountUseCases accounts, AccountHistoryReader reader, UnitOfWork work) {
         return new AccountHistoryService(accounts, reader, work);
     }
-    @Bean LedgerService ledgerService(AccountStore accounts, TransactionStore transactions,
+    @Bean DefaultLedgerService ledgerService(AccountStore accounts, TransactionStore transactions,
             TransactionAnnouncements announcements, UnitOfWork work) {
-        return new LedgerService(accounts, transactions, announcements, work);
+        return new DefaultLedgerService(accounts, transactions, announcements, work);
     }
     @Bean PaymentService paymentService(UnitOfWork work, PaymentStore payments, AccountStore accounts,
-            JsonCodec json, TransactionUseCases ledger) {
+            JsonCodec json, LedgerService ledger) {
         return new PaymentService(work, payments, accounts, json, ledger);
     }
     @Bean IdempotencyService idempotencyService(IdempotencyStore store, JsonCodec json, UnitOfWork work) {

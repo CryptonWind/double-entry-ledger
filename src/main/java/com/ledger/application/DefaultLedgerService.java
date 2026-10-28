@@ -3,7 +3,7 @@ package com.ledger.application;
 import com.ledger.application.port.out.AccountStore;
 import com.ledger.domain.model.Account;
 import com.ledger.domain.exception.LedgerException;
-import com.ledger.application.port.in.TransactionUseCases;
+import com.ledger.application.port.in.LedgerService;
 import com.ledger.application.port.out.TransactionAnnouncements;
 import com.ledger.application.port.out.TransactionStore;
 import com.ledger.domain.model.LedgerTransaction;
@@ -20,7 +20,7 @@ import static com.ledger.application.model.LedgerModels.*;
 
 @RequiredArgsConstructor
 @Log4j2
-public class LedgerService implements TransactionUseCases {
+public class DefaultLedgerService implements LedgerService {
     private final AccountStore accounts;
     private final TransactionStore transactions;
     private final TransactionAnnouncements announcements;
@@ -64,7 +64,7 @@ public class LedgerService implements TransactionUseCases {
     @Override
     public TransactionView get(String id) {
         log.debug("Reading transaction transactionId={}", id);
-        return work.read(() -> transactions.find(id).map(LedgerService::view).orElseThrow(() ->
+        return work.read(() -> transactions.find(id).map(DefaultLedgerService::view).orElseThrow(() ->
                 new LedgerException(404, "TRANSACTION_NOT_FOUND", "transactionId", "Unknown transaction: " + id)));
     }
 

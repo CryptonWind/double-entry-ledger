@@ -4,7 +4,7 @@ import com.ledger.application.port.in.IdempotentOperations;
 import com.ledger.domain.exception.LedgerException;
 import com.ledger.application.model.LedgerModels.RecordTransaction;
 import com.ledger.application.model.LedgerModels.TransactionView;
-import com.ledger.application.port.in.TransactionUseCases;
+import com.ledger.application.port.in.LedgerService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -23,7 +23,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 @Tag(name = "Transactions", description = "Atomic recording, immutable reads and single-use reversals")
 @DocumentedErrors
 public class TransactionController {
-    private final TransactionUseCases ledger;
+    private final LedgerService ledger;
     private final IdempotentOperations idempotency;
 
     @PostMapping

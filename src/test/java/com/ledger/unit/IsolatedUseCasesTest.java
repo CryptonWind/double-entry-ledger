@@ -2,7 +2,7 @@ package com.ledger.unit;
 
 import com.ledger.application.*;
 import com.ledger.application.model.LedgerModels.*;
-import com.ledger.application.port.in.TransactionUseCases;
+import com.ledger.application.port.in.LedgerService;
 import com.ledger.application.port.out.*;
 import com.ledger.domain.exception.LedgerException;
 import com.ledger.domain.model.Account;
@@ -48,7 +48,7 @@ class IsolatedUseCasesTest {
         var store = mock(PaymentStore.class);
         var accounts = mock(AccountStore.class);
         var codec = mock(JsonCodec.class);
-        var ledger = mock(TransactionUseCases.class);
+        var ledger = mock(LedgerService.class);
         var service = new PaymentService(work, store, accounts, codec, ledger);
         when(codec.fingerprint(any())).thenReturn("fingerprint");
         when(store.reserve("pay-42", "fingerprint")).thenReturn(new PaymentStore.Reservation("fingerprint", null));

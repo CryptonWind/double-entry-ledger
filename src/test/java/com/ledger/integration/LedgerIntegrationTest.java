@@ -5,7 +5,7 @@ import com.ledger.application.IdempotencyService;
 import com.ledger.infrastructure.output.messaging.ConfirmedPublisher;
 import com.ledger.infrastructure.input.scheduler.OutboxPublisher;
 import com.ledger.application.model.LedgerModels.*;
-import com.ledger.application.LedgerService;
+import com.ledger.application.port.in.LedgerService;
 import com.ledger.domain.model.Direction;
 import java.math.BigDecimal;
 import java.net.URI;
